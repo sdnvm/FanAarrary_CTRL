@@ -1,0 +1,73 @@
+/*main.c中*/
+int main_test(void)
+{
+	/*测试pwm输出与单通道极性翻转捕获 */
+	if(capture_end_flag == 1)
+	{
+		extern int TIM3CH2_Duty;
+		float Duty_want = 0;
+		float err_fg = 0.0;
+		Duty_want = 5000;
+		Duty_want = 5000 / SPEED_MX;
+		err_fg = TIM3CH2_Duty - Duty_want;
+		if(err_fg < 1.0 || err_fg > 1.0)
+		{
+			OLED_ShowString(1, 1, "Err");
+		}
+		else{
+			OLED_ShowNum(1, 1, TIM3CH2_Duty, 4);
+		}
+		capture_end_flag = 3;
+	}
+}
+
+
+
+/*tim.c中*/
+volatile float TIM3CH2_Freq = 0.0;
+volatile float TIM3CH2_Duty = 0.0;
+volatile int capture_end_flag = 0;
+
+volatile uint32_t high_val = 0;
+volatile uint32_t low_val = 0;
+
+//TIM2、FG2单通道采集PWM频率+占空比
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+	static uint8_t capture_cnt = 1;    //电平捕捉计数
+
+	if(htim->Instance == TIM2)        //判断是否由定时器3产生
+	{
+		if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3)    //TIM3 通道2
+		{
+			if(capture_end_flag == 0)
+			{
+				if(capture_cnt == 1)        //第一个上升沿
+				{
+					capture_cnt = 2;
+					__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_2, TIM_INPUTCHANNELPOLARITY_FALLING); //设置成下降沿触发
+					__HAL_TIM_SetCounter(htim, 0);    //清空定时器计数值
+					high_val = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);    //由第一个上升沿设为起始位置
+
+				}else if(capture_cnt == 2)    //第一个下降沿
+				{
+					capture_cnt = 3;
+					low_val = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);    //低电平起始位置
+					__HAL_TIM_SET_CAPTUREPOLARITY(htim, TIM_CHANNEL_2,TIM_INPUTCHANNELPOLARITY_RISING); //设置成上升沿触发
+
+
+				}else if(capture_cnt == 3)    //第二个上升沿
+				{
+					capture_cnt = 1;
+					high_val = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
+
+					//计算频率
+					TIM3CH2_Freq = (float)80000000 / 80 / (high_val+1);
+					//计算占空比
+					TIM3CH2_Duty = (float)(low_val+1) / (high_val+1);
+					capture_end_flag = 1;
+				}
+			}
+		}
+	}
+}

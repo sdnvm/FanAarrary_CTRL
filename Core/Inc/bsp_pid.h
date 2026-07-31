@@ -6,21 +6,22 @@
 
 typedef struct
 {
-  float target_rpm;     //Ä¿±êÖµ
-	float actual_rpm;     //Êµ¼ÊÖµ
-	float err;            //µ±Ç°Æ«²îÖµ
-	float err_next;       //ÏÂÒ»¸öÆ«²îÖµ
-	float err_last;       //ÉÏÒ»¸öÆ«²îÖµ
+	float target_rpm; //ç›®æ ‡å€¼
+	float actual_rpm; //å®é™…å€¼
+	float err; //å½“å‰åå·®å€¼
+	float err_next; //ä¸‹ä¸€ä¸ªåå·®å€¼
+	float err_last; //ä¸Šä¸€ä¸ªåå·®å€¼
 	float Kp, Ki, Kd;
-}_pid;
+} PidPara;
 
-extern _pid pid_1,pid_2,pid_3,pid_4;
+extern PidPara pid_para[4];
 
 extern void PID_param_init(void);
-extern void set_pid_target(uint8_t c, float temp_val);
-extern float get_pid_actual(_pid *pid);
-extern void set_p_i_d(uint8_t ccc, float p, float i, float d);
-extern float PID_realize(_pid *pid);
-extern void time_period_fun(void);
+extern void set_pid_target(uint8_t c, float temp_target_rpm);
+extern void set_p_i_d(uint8_t c, float p, float i, float d);
+extern float PID_realize(PidPara *pid);
+
+// extern float get_pid_actual(PidPara *pid);
+// extern void time_period_fun(void);
 
 #endif

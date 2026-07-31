@@ -403,7 +403,7 @@ void TIM6_IRQHandler(void)
 		}		//sin判断的代码在-can里
 //		OLED_ShowNum(4,6,IC_2,5);
 //		OLED_ShowNum(4,12,(uint16_t)OVERFLOW_LAST2,5);
-		bldc_pid_control(chanel,CCR_NUM);
+		pid_control(chanel-1, CCR_NUM);
 		
 		static uint16_t ctrl_tim = 0;
 		ctrl_tim ++;
@@ -413,11 +413,11 @@ void TIM6_IRQHandler(void)
                 sin_point_index = 0;    // 重置索引，为下一个正弦波做准备       
             }
 								/*if (c == 1) {
-                    pid_1.target_rpm = sin_control_values[sin_point_index];
+                    pid_para[0].target_rpm = sin_control_values[sin_point_index];
                 } else if (c == 2) {*/
 								if(Ctrl_Para.enable_pid[0]){
 									set_rpm(1, sin_control_values[sin_point_index]);
-									pid_1.target_rpm = sin_control_values[sin_point_index];
+									pid_para[0].target_rpm = sin_control_values[sin_point_index];
 								}else{
 									set_rpm(1, sin_control_values[sin_point_index]);
 								}
