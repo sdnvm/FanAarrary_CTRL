@@ -30,6 +30,7 @@ CAN_HandleTypeDef hcan;
 /* CAN init function */
 void MX_CAN_Init(void)
 {
+
   /* USER CODE BEGIN CAN_Init 0 */
 
   /* USER CODE END CAN_Init 0 */
