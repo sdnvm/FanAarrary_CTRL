@@ -22,7 +22,6 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "protocol.h"
 #include "control.h"
 #include "tim.h"
 #include "bsp_pid.h"
@@ -47,20 +46,20 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-__IO uint16_t overflow_num1=0;
+__IO uint16_t overflow_num1=0;//当前比较寄存器溢出次数
 __IO uint16_t overflow_num2=0;
 __IO uint16_t overflow_num3=0;
 __IO uint16_t overflow_num4=0;
-__IO uint16_t OVERFLOW_LAST1=0;
+__IO uint16_t OVERFLOW_LAST1=0;//上一次比较寄存器溢出此时
 __IO uint16_t OVERFLOW_LAST2=0;
 __IO uint16_t OVERFLOW_LAST3=0;
 __IO uint16_t OVERFLOW_LAST4=0;
 
-__IO uint16_t IC_1 = 0;
+__IO uint16_t IC_1 = 0;//捕获值
 __IO uint16_t IC_2 = 0;
 __IO uint16_t IC_3 = 0;
 __IO uint16_t IC_4 = 0;
-__IO uint16_t IC_last1 = 0;
+__IO uint16_t IC_last1 = 0;//上一次的捕获值
 __IO uint16_t IC_last2 = 0;
 __IO uint16_t IC_last3 = 0;
 __IO uint16_t IC_last4 = 0;
@@ -231,6 +230,13 @@ void SysTick_Handler(void)
 void TIM2_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM2_IRQn 0 */
+	//溢出中断
+	if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE))
+	{
+		overflow_num2 += 1;
+		__HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);
+	}
+	//输入捕获中断
 	if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_CC3))
 	{
 		//cc_flag[2] = 1;
@@ -238,7 +244,7 @@ void TIM2_IRQHandler(void)
 		IC_last2 = IC_2;
 		IC_2 = (&htim2)->Instance->CCR3;
 		OVERFLOW_LAST2 = overflow_num2;
-		overflow_num2=0;
+		overflow_num2 = 0;
 		/*if(n>2)n=1;
 		switch(n){
 			case 1:
@@ -254,12 +260,7 @@ void TIM2_IRQHandler(void)
 		__HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);
 	//	__HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_CC1);
 	}
-		 //溢出中断
-	else if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE))
-	{
-		overflow_num2+=1;
-		__HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);
-	}
+
   /* USER CODE END TIM2_IRQn 0 */
   /* USER CODE BEGIN TIM2_IRQn 1 */
 
@@ -274,7 +275,7 @@ void TIM3_IRQHandler(void)
   /* USER CODE BEGIN TIM3_IRQn 0 */
 	if (__HAL_TIM_GET_FLAG(&htim3, TIM_FLAG_UPDATE))
 	{
-		overflow_num3+=1;
+		overflow_num3 += 1;
 		__HAL_TIM_CLEAR_FLAG(&htim3, TIM_FLAG_UPDATE);
 	}
 	if (__HAL_TIM_GET_FLAG(&htim3, TIM_FLAG_CC3))
@@ -282,7 +283,7 @@ void TIM3_IRQHandler(void)
 		IC_last3 = IC_3;
 		IC_3 = (&htim3)->Instance->CCR3;
 		OVERFLOW_LAST3 = overflow_num3;
-		overflow_num3=0;
+		overflow_num3 = 0;
 		//__HAL_TIM_CLEAR_FLAG(&htim4, TIM_FLAG_UPDATE);
 	}
   /* USER CODE END TIM3_IRQn 0 */
@@ -324,7 +325,7 @@ void USART3_IRQHandler(void)
 {
   /* USER CODE BEGIN USART3_IRQn 0 */
 	uint8_t dr = __HAL_UART_FLUSH_DRREGISTER(&huart3);
-	protocol_data_recv(&dr, 1);
+	//protocol_data_recv(&dr, 1);
   /* USER CODE END USART3_IRQn 0 */
   HAL_UART_IRQHandler(&huart3);
   /* USER CODE BEGIN USART3_IRQn 1 */
@@ -343,13 +344,13 @@ void TIM5_IRQHandler(void)
 		IC_last4 = IC_4;
 		IC_4 = (&htim5)->Instance->CCR4;
 		OVERFLOW_LAST4 = overflow_num4;
-		overflow_num4=0;
+		overflow_num4 = 0;
 		__HAL_TIM_CLEAR_FLAG(&htim5, TIM_FLAG_UPDATE);
 	}
 		 //溢出中断
 	if (__HAL_TIM_GET_FLAG(&htim5, TIM_FLAG_UPDATE))
 	{
-		overflow_num4+=1;
+		overflow_num4 += 1;
 		__HAL_TIM_CLEAR_FLAG(&htim5, TIM_FLAG_UPDATE);
 	}
   /* USER CODE END TIM5_IRQn 0 */
@@ -363,17 +364,19 @@ void TIM5_IRQHandler(void)
   */
 void TIM6_IRQHandler(void)
 {
-  /* USER CODE BEGIN TIM6_IRQn 0 */
-	uint32_t CCR_NUM;
-	if (__HAL_TIM_GET_FLAG(&htim6, TIM_FLAG_UPDATE)){
-		static uint8_t chanel=1;
-		if(chanel>2)chanel=1;
-		switch(chanel){
-			case 1:
+	/* USER CODE BEGIN TIM6_IRQn 0 */
+	if (__HAL_TIM_GET_FLAG(&htim6, TIM_FLAG_UPDATE))
+	{
+		uint32_t CCR_NUM = 0;
+		static uint8_t chanel = 0;
+		if (chanel >= 2)chanel = 0;
+		switch (chanel)
+		{
+		case 0:
 			{
 				//CCR_NUM = overflow_num1*65535+__HAL_TIM_GET_COMPARE(&htim1,TIM_CHANNEL_1);
 				//HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
-			  //HAL_TIM_Base_Start_IT(&htim2);
+				//HAL_TIM_Base_Start_IT(&htim2);
 				//HAL_TIM_IC_Stop_IT(&htim1,TIM_CHANNEL_1);
 				CCR_NUM = (OVERFLOW_LAST1 * 65535 + IC_1) - IC_last1;
 				/*if(CCR_NUM > 2000000){//超时处理
@@ -384,56 +387,64 @@ void TIM6_IRQHandler(void)
 					c+=1;	
 					return;
 				}*/
-			}break;
-			case 2:
+			}
+			break;
+		case 1:
 			{
-			//	HAL_TIM_IC_Start_IT(&htim1,TIM_CHANNEL_1);
-			//	HAL_TIM_IC_Stop_IT(&htim2,TIM_CHANNEL_1);
+				//	HAL_TIM_IC_Start_IT(&htim1,TIM_CHANNEL_1);
+				//	HAL_TIM_IC_Stop_IT(&htim2,TIM_CHANNEL_1);
 				//HAL_TIM_Base_Stop_IT(&htim2);				
 				CCR_NUM = (OVERFLOW_LAST2 * 65535 + IC_2) - IC_last2;
-			}break;
-			case 3:
+			}
+			break;
+		case 2:
 			{
 				CCR_NUM = (OVERFLOW_LAST3 * 65535 + IC_3) - IC_last3;
-			}break;
-			case 4:
+			}
+			break;
+		case 3:
 			{
 				CCR_NUM = (OVERFLOW_LAST4 * 65535 + IC_4) - IC_last4;
-			}break;
-		}		//sin判断的代码在-can里
-//		OLED_ShowNum(4,6,IC_2,5);
-//		OLED_ShowNum(4,12,(uint16_t)OVERFLOW_LAST2,5);
-		pid_control(chanel-1, CCR_NUM);
-		
-		static uint16_t ctrl_tim = 0;
-		ctrl_tim ++;
-    if (ctrl_tim >= Sin_Para1.ctrl_num) {
-        if (TrackCurve_Para.enable_TrackCurve) {
-            if (sin_point_index == Sin_Para1.sampl_num) {
-                sin_point_index = 0;    // 重置索引，为下一个正弦波做准备       
-            }
-								/*if (c == 1) {
-                    pid_para[0].target_rpm = sin_control_values[sin_point_index];
-                } else if (c == 2) {*/
-								if(Ctrl_Para.enable_pid[0]){
-									set_rpm(1, sin_control_values[sin_point_index]);
-									pid_para[0].target_rpm = sin_control_values[sin_point_index];
-								}else{
-									set_rpm(1, sin_control_values[sin_point_index]);
-								}
-               // }
-                sin_point_index++; // 移动到下一个点
-        }
-				ctrl_tim = 0; // 重置溢出计数器
-    }
-		
-		chanel+=1;
-		__HAL_TIM_CLEAR_FLAG(&htim6,TIM_FLAG_UPDATE);
+			}
+			break;
+		default:
+			break;
+		} //sin判断的代码在-can里
+		//		OLED_ShowNum(4,6,IC_2,5);
+		//		OLED_ShowNum(4,12,(uint16_t)OVERFLOW_LAST2,5);
+		pid_control(chanel, CCR_NUM);
+
+		static uint16_t ctrl_tim = 0;//决定采样时间
+		ctrl_tim++;
+		if (Sys_Para.RunMode == S_TrackingCurve && ctrl_tim >= Sin_Para1.ctrl_num)
+		{
+			if (sin_point_index == Sin_Para1.sampl_num)
+			{
+				sin_point_index = 0; // 重置索引，为下一个正弦波做准备
+			}
+			/*if (c == 1) {
+			pid_para[0].target_rpm = sin_control_values[sin_point_index];
+			} else if (c == 2) {*/
+			if (Ctrl_Para.enable_pid[0])
+			{
+				set_rpm(0, sin_control_values[sin_point_index]);
+				pid_para[0].target_rpm = sin_control_values[sin_point_index];
+			}
+			else
+			{
+				set_rpm(0, sin_control_values[sin_point_index]);
+			}
+			// }
+			sin_point_index++; // 移动到下一个点
+			ctrl_tim = 0; // 重置溢出计数器
+		}
+		chanel += 1;
+		//清中断标志位
+		__HAL_TIM_CLEAR_FLAG(&htim6, TIM_FLAG_UPDATE);
 		TIM4->SR &= ~(TIM_SR_UIF | TIM_SR_CC3IF);
 		TIM2->SR &= ~(TIM_SR_UIF | TIM_SR_CC3IF);
 		TIM3->SR &= ~(TIM_SR_UIF | TIM_SR_CC3IF);
 		TIM5->SR &= ~(TIM_SR_UIF | TIM_SR_CC4IF);
-		
 	}
   /* USER CODE END TIM6_IRQn 0 */
   /* USER CODE BEGIN TIM6_IRQn 1 */

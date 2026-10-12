@@ -24,7 +24,7 @@ void cacul_sin_params(void)
 	}
   for (uint8_t j = 0; j < Sin_Para1.sampl_num ; j++) 
 	{
-        const float step = 2 * M_PI / Sin_Para1.sampl_num; // 将一个T分为n_points个点
+        const float step = 2 * M_PAI / Sin_Para1.sampl_num; // 将一个T分为n_points个点
         float angle = j * step;
         float sin_value = sin(angle);
         

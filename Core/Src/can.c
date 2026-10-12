@@ -56,47 +56,47 @@ void MX_CAN_Init(void)
   }
   /* USER CODE BEGIN CAN_Init 2 */
   //过滤器配置
-  /*16位列表-FIFO0*/
+  /*16位列表-FIFO0===大多数指令*/
   CAN_FilterTypeDef filter1;
-  filter1.FilterScale = CAN_FILTERSCALE_16BIT;
+  filter1.FilterScale = CAN_FILTERSCALE_16BIT;//配置为16位
   filter1.FilterActivation = CAN_FILTER_ENABLE;
-  filter1.FilterFIFOAssignment = CAN_FilterFIFO0;
-  filter1.FilterMode = CAN_FILTERMODE_IDLIST;
+  filter1.FilterFIFOAssignment = CAN_FilterFIFO0;//选择fifo0
+  filter1.FilterMode = CAN_FILTERMODE_IDLIST;//配置为列表模式
   filter1.FilterBank = 0;
-  filter1.FilterIdHigh = (0x001 << 5) | 0x10; //复位
-  filter1.FilterIdLow = (0x002 << 5) | 0x10; //停止
-  filter1.FilterMaskIdHigh = (0x003 << 5) | 0x10; //启动
-  filter1.FilterMaskIdLow = (0x008 << 5) | 0x10; //保存参数
+  filter1.FilterIdHigh = (0x001 << 5); //广播的复位、启停
+  filter1.FilterIdLow = (0x002 << 5); //广播的使能/失能、保存参数
+  filter1.FilterMaskIdHigh = (ID_ThisBoard << 9 | 0x001 << 5); //复位、启停
+  filter1.FilterMaskIdLow = (ID_ThisBoard << 9 | 0x002 << 5); //使能/失能、保存参数、上传状态/转速
   HAL_CAN_ConfigFilter(&hcan, &filter1);
   filter1.FilterBank = 1;
-  filter1.FilterIdHigh = (0x004 << 5) | 0x10; //失能pid
-  filter1.FilterIdLow = (0x005 << 5) | 0x10; //使能pid
-  filter1.FilterMaskIdHigh = (0x004 << 5); //pid首帧
-  filter1.FilterMaskIdLow = (0x005 << 5); //pid尾帧
+  filter1.FilterIdHigh = (0x003 << 5); //广播的目标值首帧
+  filter1.FilterIdLow = (0x004 << 5); //广播的目标值尾帧
+  filter1.FilterMaskIdHigh = (ID_ThisBoard << 9 | 0x003 << 5); //目标值首帧
+  filter1.FilterMaskIdLow = (ID_ThisBoard << 9 | 0x004 << 5); //目标值尾帧
   HAL_CAN_ConfigFilter(&hcan, &filter1);
-  /*filter1.FilterBank = 2;
-  filter1.FilterIdHigh = (0x006<<5) | 0x10;//失能跟踪曲线
-  filter1.FilterIdLow = (0x007<<5) | 0x10;//使能跟踪曲线
-  filter1.FilterMaskIdHigh = 0XFFFF;//
-  filter1.FilterMaskIdLow = 0xFFFF;//遥控帧
-  HAL_CAN_ConfigFilter(&hcan, &filter1);*/
-  /*16位列表-FIFO1===跟踪曲线采样点*/
+  filter1.FilterBank = 2;
+  filter1.FilterIdHigh = (0x07F << 5); //相位首帧
+  filter1.FilterIdLow = (0x07F << 5); //相位尾帧
+  filter1.FilterMaskIdHigh = (ID_ThisBoard << 9 | 0x00A << 5); //相位首帧
+  filter1.FilterMaskIdLow = (ID_ThisBoard << 9 | 0x00B << 5); //相位尾帧
+  HAL_CAN_ConfigFilter(&hcan, &filter1);
+  /*16位列表-FIFO1===跟踪曲线采样点、pid参数*/
   filter1.FilterBank = 3;
-  filter1.FilterFIFOAssignment = CAN_FilterFIFO1;
-  filter1.FilterIdHigh = 0x00A << 5; //首帧
-  filter1.FilterIdLow = 0x00B << 5; //续帧
-  filter1.FilterMaskIdHigh = 0x00C << 5; //尾帧
-  filter1.FilterMaskIdLow = (0x006 << 5) | 0x10; //使|失能跟踪曲线
+  filter1.FilterFIFOAssignment = CAN_FilterFIFO1;//改为fifo1
+  filter1.FilterIdHigh = 0x006 << 5; //首帧
+  filter1.FilterIdLow = 0x007 << 5; //续帧
+  filter1.FilterMaskIdHigh = 0x008 << 5; //尾帧
+  filter1.FilterMaskIdLow = (0x009 << 5); //set pid参数
   HAL_CAN_ConfigFilter(&hcan, &filter1);
-  /*16位屏蔽-FIFO0===指定风机帧*/
+  /*/*16位屏蔽-FIFO0===指定风机帧#1#
   filter1.FilterBank = 4;
-  filter1.FilterFIFOAssignment = CAN_FilterFIFO0;
-  filter1.FilterMode = CAN_FILTERMODE_IDMASK;
+  filter1.FilterFIFOAssignment = CAN_FilterFIFO0;//改为fifo0
+  filter1.FilterMode = CAN_FILTERMODE_IDMASK;//改为屏蔽模式
   filter1.FilterIdHigh = ID_ThisBoard << (5 + 4); //本机的数据帧
   filter1.FilterIdLow = ID_ThisBoard << 9 | 0x10; //本机的遥控帧
   filter1.FilterMaskIdHigh = (0x7F0 << 5) | 0x10 | 0x8;
   filter1.FilterMaskIdLow = (0x7F0 << 5) | 0x10 | 0x8;
-  HAL_CAN_ConfigFilter(&hcan, &filter1);
+  HAL_CAN_ConfigFilter(&hcan, &filter1);*/
   /* USER CODE END CAN_Init 2 */
 
 }
@@ -218,7 +218,6 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef* hcan)
 	case 0x211: // 定长数据尾帧
 		//  TODO: 定长数据处理
 		break;
-
 	default:
 		break;
 	}

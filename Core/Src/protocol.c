@@ -313,7 +313,7 @@ int8_t receiving_process(void)
 				type_cast_t temp_target;
         temp_target.f = COMPOUND_32BIT(&frame_data[13]);    // 得到数据
 				
-				set_rpm(packet.ch, temp_target.f);				
+				set_rpm(packet.ch - 1, temp_target.f);
 				pid_reset(packet.ch,(uint16_t)temp_target.f);
 				
 				Ctrl_Para.enable_fan[packet.ch] = 1;

@@ -14,7 +14,7 @@ typedef struct {
 } SinParams;
 
 #define MAX_SIN_POINTS 64  // ???????(??????100?)
-#define M_PI 3.141593f
+#define M_PAI 3.141593f
 #define STEP 0.5f
 #define SIN_SAMPLE_NUM 2
 

@@ -36,10 +36,17 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+typedef enum
+{
+	S_Wait,
+	S_RecevData,
+	S_NormRuning,
+	S_TrackingCurve
+}SM_SysState;
 typedef struct 
 {
 	uint16_t Speed_MX_Fan;		//风机最大转速
-	uint8_t ctrl_mode;			//跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
+	SM_SysState RunMode;		//跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
 	bool enable_send;			//向上位机同步数据？
 	uint16_t timer_ctrl_T;		//控制定时器溢出时间/ms
 	uint16_t timer_fg_f;		//fg捕获定时器时钟/mhz
@@ -48,8 +55,8 @@ typedef struct
 typedef struct 
 {
 	uint16_t rpm_want[4];		//目标转速
-	bool enable_pid[5];			//pid开关状态，[0]为开关
-	bool enable_fan[5];			//风机开关状态，[0]为开关
+	bool enable_pid[5];			//pid开关状态，[0]为开关，后几个由程序控制，别直接写1
+	bool enable_fan[5];			//风机开关状态，[0]为总开关,后几个为具体开关
 }CtrlPara;
 typedef struct 
 {
@@ -68,10 +75,10 @@ typedef struct
 {
 	bool enable_TrackCurve;		//失能跟踪
 	uint16_t sample_time;		//采样时间 ms
-	uint16_t phase[4];			//曲线相位 ms
+	uint16_t phase[4];			//曲线相位 ms，收到启动信号后延时时间
 	uint16_t ctrl_num;			//乘ctrl_time=sin_ctrl_time
 	uint16_t num_data;			//数据点个数
-	uint32_t num_data_received	//当前收到的有效数据包数量
+	uint32_t num_data_received;	//当前收到的有效数据包数量
 	uint16_t buffer_byte;		//缓冲区字节数
 	bool is_assembling;			//正在接收曲线数据？
 	bool start_cacul;			//开始计算
@@ -154,7 +161,7 @@ void Error_Handler(void);
 #define TS 500						//采样周期
 //#define KTS (60.0f*DC_POWER/12)
 //#define KCCR (30*72000000)/2/8/10
-#define ID_ThisBoard 0x001			//本驱动板ID
+#define ID_ThisBoard 0x004			//本驱动板ID
 
 extern bool pid_enable[5];
 extern bool fan_enable[5];

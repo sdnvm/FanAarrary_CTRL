@@ -72,46 +72,46 @@ void MX_GPIO_Init(void)
 //按键扫描
 uint8_t Key_GetState(void)
 {
-	uint8_t Keystate = 0;	
+	uint8_t Keystate = 0;
 	uint32_t PressDuration;
-	if (HAL_GPIO_ReadPin(GPIOA, SW2_Pin) == 1)	
+	if (HAL_GPIO_ReadPin(GPIOA, SW2_Pin) == 1)
 	{
-		HAL_Delay(15);//消抖
-    if(HAL_GPIO_ReadPin(GPIOA,SW2_Pin) ==1)//非扰动
-    {
-      PressDuration = HAL_GetTick();
-      while (HAL_GPIO_ReadPin(GPIOA, SW2_Pin) == 1);//等待松手
-      PressDuration = HAL_GetTick() - PressDuration;//记录按下时长
-	  	HAL_Delay(15);//消抖
-      if(PressDuration < 500)
-      {
-        Keystate = SW2_SINGLE_CLICK;//单击
-      }
-      else
-      {
-        Keystate = SW2_LONG_PRESS;//长按
-      }
-    }
+		HAL_Delay(15); //消抖
+		if (HAL_GPIO_ReadPin(GPIOA,SW2_Pin) == 1) //非扰动
+		{
+			PressDuration = HAL_GetTick();
+			while (HAL_GPIO_ReadPin(GPIOA, SW2_Pin) == 1); //等待松手
+			PressDuration = HAL_GetTick() - PressDuration; //记录按下时长
+			HAL_Delay(15); //消抖
+			if (PressDuration < 500)
+			{
+				Keystate = SW2_SINGLE_CLICK; //单击
+			}
+			else
+			{
+				Keystate = SW2_LONG_PRESS; //长按
+			}
+		}
 	}
-  else if (HAL_GPIO_ReadPin(GPIOA, SW3_Pin) == 1)
-  {
-    HAL_Delay(15);//消抖
-    if(HAL_GPIO_ReadPin(GPIOA,SW3_Pin) ==1)//非扰动
-    {
-      PressDuration = HAL_GetTick();
-      while (HAL_GPIO_ReadPin(GPIOA, SW3_Pin) == 1);//等待松手
-      PressDuration = HAL_GetTick() - PressDuration;//记录按下时长
-	  	HAL_Delay(15);//消抖
-      if(PressDuration < 500)
-      {
-        Keystate = SW3_SINGLE_CLICK;//单击
-      }
-      else
-      {
-        Keystate = SW3_LONG_PRESS;//长按
-      }
-    }
-  }
+	else if (HAL_GPIO_ReadPin(GPIOA, SW3_Pin) == 1)
+	{
+		HAL_Delay(15); //消抖
+		if (HAL_GPIO_ReadPin(GPIOA,SW3_Pin) == 1) //非扰动
+		{
+			PressDuration = HAL_GetTick();
+			while (HAL_GPIO_ReadPin(GPIOA, SW3_Pin) == 1); //等待松手
+			PressDuration = HAL_GetTick() - PressDuration; //记录按下时长
+			HAL_Delay(15); //消抖
+			if (PressDuration < 500)
+			{
+				Keystate = SW3_SINGLE_CLICK; //单击
+			}
+			else
+			{
+				Keystate = SW3_LONG_PRESS; //长按
+			}
+		}
+	}
 	return Keystate;
 }
 /* USER CODE END 2 */

@@ -1,10 +1,10 @@
 #include "bsp_pid.h"
 #include "math.h"
-#include "protocol.h"
 // 定义全局变量 */
 PidPara pid_para[4];
 
-void PID_param_init()//初始化pid参数
+/*初始化pid参数*/
+void PID_param_init()
 {
 	for(int i=0;i<4;i++)
 	{
@@ -18,22 +18,35 @@ void PID_param_init()//初始化pid参数
 		pid_para[i].Kd = 0.27;
 	}
 }
-
-void set_pid_target(uint8_t c, float temp_target_rpm) // 更新目标值
+/*更新目标值*/
+void set_pid_target(uint8_t c, float temp_target_rpm)
 {
 	c = c - 1;
 	pid_para[c].target_rpm = temp_target_rpm;
 }
-
-void set_p_i_d(uint8_t c, float p, float i, float d)//更新pid参数
+/*更新pid参数*/
+void set_p_i_d(uint8_t c, float p, float i, float d)
 {
-	c = c - 1;
-	pid_para[c].Kp = p;
-	pid_para[c].Ki = i;
-	pid_para[c].Kd = d;
+	for(int j=0;j<4;j++)
+	{
+		pid_para[j].Kp = p;
+		pid_para[j].Ki = i;
+		pid_para[j].Kd = d;
+	}
 }
-
-float PID_realize(PidPara *pid) //增量式pid计算
+/*pid开关*/
+void pid_switch(uint8_t pidswitch)
+{
+	switch (pidswitch)
+	{
+	case 0:
+		break;
+	case 1:
+		break;
+	}
+}
+/*增量式pid计算*/
+float PID_realize(PidPara *pid)
 {
 	//传入实际值
 	// pid->actual_rpm = temp_RPM;

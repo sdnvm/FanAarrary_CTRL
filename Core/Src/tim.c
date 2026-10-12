@@ -592,8 +592,8 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
 		HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_2);	//开启pwm1
 		HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);	//开启pwm2
 		HAL_TIM_Base_Start(&htim1);
+		set_rpm(0, START_RPM);
 		set_rpm(1, START_RPM);
-		set_rpm(2, START_RPM);
   /* USER CODE END TIM1_MspPostInit 1 */
   }
   else if(timHandle->Instance==TIM8)
@@ -616,8 +616,8 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
 		HAL_TIM_PWM_Start(&htim8,TIM_CHANNEL_3);	//开启pwm3
 		HAL_TIM_PWM_Start(&htim8,TIM_CHANNEL_1);	//开启pwm4
 		HAL_TIM_Base_Start(&htim8);
+		set_rpm(2,START_RPM);
 		set_rpm(3,START_RPM);
-		set_rpm(4,START_RPM);
   /* USER CODE END TIM8_MspPostInit 1 */
   }
 
@@ -741,7 +741,7 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 }
 
 /* USER CODE BEGIN 1 */
-void SamplingTime_Modify(uint16_t SamplingTime_ms, uint16_t pwm_arr)
+void SamplingTime_Modify(const uint16_t SamplingTime_ms, const uint16_t pwm_arr)
 {
 	uint16_t arr_value_s = (SamplingTime_ms * 10) - 1;
 	__HAL_TIM_DISABLE_IT(&htim6, TIM_IT_UPDATE);
@@ -762,31 +762,32 @@ void SamplingTime_Modify(uint16_t SamplingTime_ms, uint16_t pwm_arr)
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
 	__HAL_TIM_ENABLE_IT(&htim6, TIM_IT_UPDATE);
 }
-void set_rpm(uint8_t temp_cc,float rpm)
+void set_rpm(const uint8_t temp_cc, const float rpm)
 {
   uint32_t comp = (uint32_t)((((double)Sys_Para.timer_pwm_ARR * (double)rpm ) / (double)Sys_Para.Speed_MX_Fan) + 0.5);
 	comp = (comp > Sys_Para.timer_pwm_ARR) ? Sys_Para.timer_pwm_ARR : comp;  //限幅
-	send_computer(0x01, temp_cc, &comp, 4);     // 给通道 1 发送控制值
+	//send_computer(0x01, temp_cc, &comp, 4);     // 给通道 1 发送控制值
 	if(Ctrl_Para.enable_pid[0] == 0)
 	{
-		OLED_ShowNum(2, 13, (uint16_t)comp, 4);
+		OLED_ShowNum(2, 13, (uint16_t)comp, 4);//显示算得的比较值
 	}
 	switch(temp_cc){
-			case 1:{
+			case 0:{
 				__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_2, (uint16_t)comp);//pwm1
 			}break;
-			case 2:{	
+			case 1:{
 				__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1, (uint16_t)comp);//pwm2
 			}break;
-      case 3:{
+      case 2:{
         __HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_3, (uint16_t)comp);//pwm3
       }break;
-      case 4:{	
+      case 3:{
 				__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, (uint16_t)comp);//pwm4
 			}break;
 	  default:break;
 	}
 }
+
 void Start_Timer(void)
 {
 	/*开pwm*/

@@ -53,11 +53,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-        Core/Inc/bsp_pid.h
-        Core/Inc/control.h
-        Core/Inc/OLED.h
-        Core/Inc/OLED_Font.h
-        Core/Inc/sin_control.h
+        Core/Inc
     # Add user defined include paths
 )
 
