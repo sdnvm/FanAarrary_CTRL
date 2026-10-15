@@ -36,34 +36,39 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+/*系统状态枚举*/
 typedef enum
 {
-	S_Wait,
-	S_RecevData,
-	S_NormRuning,
-	S_TrackingCurve
+	S_Wait,//等待状态
+	S_RecevData,//接收长数据状态
+	S_NormRuning,//正常运行状态
+	S_TrackingCurve//跟踪曲线状态
 }SM_SysState;
+/*系统基本参数*/
 typedef struct 
 {
 	uint16_t Speed_MX_Fan;		//风机最大转速
-	SM_SysState RunMode;		//跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
+	SM_SysState RunMode;		//状态枚举。跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
 	bool enable_send;			//向上位机同步数据？
 	uint16_t timer_ctrl_T;		//控制定时器溢出时间/ms
 	uint16_t timer_fg_f;		//fg捕获定时器时钟/mhz
 	uint16_t timer_pwm_ARR;		//pwm定时器溢出值
 }SysPara;
+/*控制器相关参数*/
 typedef struct 
 {
-	uint16_t rpm_want[4];		//目标转速
+	float rpm_want[4];		//目标转速
 	bool enable_pid[5];			//pid开关状态，[0]为开关，后几个由程序控制，别直接写1
 	bool enable_fan[5];			//风机开关状态，[0]为总开关,后几个为具体开关
 }CtrlPara;
+/*can相关参数*/
 typedef struct 
 {
-	uint16_t ID_ThisBoard;		//本机ID
+	uint16_t ID_Thisboard;		//本机ID
 	uint8_t PendingMsg;			//待解析数据量
 	bool is_Can_TXSec;			//
 }CANPara;
+/*can数据包*/
 typedef struct 
 {
 	uint32_t TxID;				//发信ID
@@ -71,6 +76,7 @@ typedef struct
 	uint8_t RxData[8];			//接收到的data
 	CAN_RxHeaderTypeDef can_RxHeader;//接收到的报文头
 }CANData;
+/*跟踪曲线相关参数*/
 typedef struct
 {
 	bool enable_TrackCurve;		//失能跟踪
@@ -86,6 +92,7 @@ typedef struct
 	//bool is_received[CURVE_SAMPLE_MX];//成功收到数据？
 }TrackCurvePara;
 #define CURVE_SAMPLE_MX 256			//拟合曲线缓冲区大小
+/*跟踪曲线数据*/
 typedef struct
 {
 	bool enable_TrackCurve;		//失能跟踪

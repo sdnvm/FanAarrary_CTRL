@@ -56,7 +56,6 @@ TrackCurveData TrackCurve_Data;
 
 /* USER CODE BEGIN PV */
 
-uint8_t KeyNum;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -229,12 +228,33 @@ int main(void)
 					break;
 				case 0x03://广播目标转速
 				case (ID_ThisBoard << 4) | 0x03: //本机目标转速
-					for (int i = 0; i < 4; i++)
+					static uint8_t rxcount_rpm = 0;//接收到的帧个数
+					if (rxcount_rpm == 0) //第一帧
 					{
-						memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 2], 2);
-
-						OLED_ShowNum(3, 1 + i * 4, Ctrl_Para.rpm_want[i], 4);
+						for (int i = 0; i < 2; i++)
+						{
+							memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 4], 4);
+							OLED_ShowNum(3, 1 + i * 4, Ctrl_Para.rpm_want[i], 4);
+						}
 					}
+					else //第二帧
+					{
+						for (int i = 2; i < 4; i++)
+						{
+							memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 4], 4);
+							OLED_ShowNum(3, 1 + i * 4, Ctrl_Para.rpm_want[i], 4);
+						}
+					}
+					if (rxcount_rpm >= 1)//接收到两帧
+					{
+						rxcount_rpm = 0;
+						OLED_ShowNum(3, 1, (uint16_t)(pid_para[0].Kp * 1000.0f), 4);
+						OLED_ShowNum(3, 6, (uint16_t)(pid_para[0].Ki * 1000.0f), 4);
+						OLED_ShowNum(3, 11, (uint16_t)(pid_para[0].Kd * 1000.0f), 4);
+						OLED_ShowString(3, 5, "|");
+						OLED_ShowString(3, 10, "|");
+					}
+					rxcount_rpm += 1;
 					break;
 				case (ID_ThisBoard << 4) | 0x0A: //跟踪曲线相位
 					for (int i = 0; i < 4; i++)
@@ -416,9 +436,11 @@ void Para_init(void)
 
 	/*CAN相关变量*/
 	//ID_ThisBoard去main.h里改
-	CAN_Data.TxID = ID_ThisBoard << 4;
+	CAN_Para.ID_Thisboard = 0x001;
+	CAN_Para.PendingMsg = 0;
+	/*CAN_Data.TxID = ID_ThisBoard << 4;
 	uint8_t temp_txid[8] = {0x11, 0x22, 0x33, 0x44};
-	memcpy(CAN_Data.TxData, temp_txid, sizeof(CAN_Data.TxData));
+	memcpy(CAN_Data.TxData, temp_txid, sizeof(CAN_Data.TxData));*/
 	/*跟踪曲线相关变量*//*系统相关变量*/
 }
 //状态切换
@@ -550,53 +572,38 @@ void key_process_cantest(void)
 	switch (KeyState)
 	{
 	case SW2_SINGLE_CLICK:
-		HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_2);
-		CAN_Data.TxID = 0x00000000;//初始化为0
+		CAN_Data.TxID = 0x00000000; //初始化为0
 		CAN_Data.TxID |= ((ID_ThisBoard & 0x7F) << 4);
 		CAN_Data.TxID |= (0x0E & 0x0F); //上传第一组转速数据
 		memcpy(&CAN_Data.TxData[0], &temp_cantx, 4);
 		memcpy(&CAN_Data.TxData[4], &temp_cantx2, 4);
 		MyCAN_Transmit(CAN_Data.TxID, CAN_Data.TxData, 8);
-		CAN_Data.TxData[0]++;
-		CAN_Data.TxData[1]++;
-		CAN_Data.TxData[2]++;
-		CAN_Data.TxData[3]++;
 		OLED_ShowHexNum(4, 6, CAN_Data.TxID, 3);
 		OLED_ShowHexNum(3, 1, CAN_Data.TxData[4], 1);
 		OLED_ShowHexNum(3, 2, CAN_Data.TxData[5], 1);
 		OLED_ShowHexNum(3, 3, CAN_Data.TxData[6], 1);
 		OLED_ShowHexNum(3, 4, CAN_Data.TxData[7], 1);
-		CAN_Data.TxID |= (0x0F & 0x0F); //上传第二组转速数据
-		MyCAN_Transmit(CAN_Data.TxID, CAN_Data.TxData, 8);
-		OLED_ShowHexNum(4, 11, CAN_Data.TxID, 3);
-		HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
-		HAL_Delay(1000);
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW2_LONG_PRESS:
 		CAN_Data.TxID = 0x00000000;
 		CAN_Data.TxID |= ((ID_ThisBoard & 0x7F) << 4);
-		CAN_Data.TxID |= (0x0E & 0x0F);//上传第一组转速数据
-		MyCAN_Transmit(CAN_Data.TxID,CAN_Data.TxData,8);
+		CAN_Data.TxID |= (0x0E & 0x0F); //上传第一组转速数据
+		MyCAN_Transmit(CAN_Data.TxID, CAN_Data.TxData, 8);
 		OLED_ShowHexNum(4, 6, CAN_Data.TxID, 3);
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		HAL_Delay(1000);
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW3_SINGLE_CLICK:
-		{
-			CAN_Data.TxID = 0x00000000;
-			CAN_Data.TxID |= (0x7F << 4);
-			CAN_Data.TxID |= (0x0A & 0x0F); //请求重发跟踪曲线
-			MyCAN_Transmit(CAN_Data.TxID, CAN_Data.TxData, 0);
-			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-			HAL_Delay(1000);
-			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		}
+		CAN_Data.TxID = 0x00000000;
+		CAN_Data.TxID |= (0x7F << 4);
+		CAN_Data.TxID |= (0x0A & 0x0F); //请求重发跟踪曲线
+		MyCAN_Transmit(CAN_Data.TxID, CAN_Data.TxData, 0);
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		HAL_Delay(1000);
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW3_LONG_PRESS:
-		{
-		}
 		break;
 	default:
 		break;
