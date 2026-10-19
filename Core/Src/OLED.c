@@ -4,6 +4,8 @@
 #include "OLED.h"
 #include <stdint.h>
 
+#include "main.h"
+
 /*引脚配置*/
 #define OLED_SCL_Pin GPIO_PIN_6
 #define OLED_SDA_Pin GPIO_PIN_7
@@ -140,17 +142,17 @@ void OLED_Clear(void)
   * @retval 无
   */
 void OLED_ShowChar(uint8_t Line, uint8_t Column, char Char)
-{      	
+{
 	uint8_t i;
-	OLED_SetCursor((Line - 1) * 2, (Column - 1) * 8);		//设置光标位置在上半部分
+	OLED_SetCursor((Line - 1) * 2, (Column - 1) * 8); //设置光标位置在上半部分
 	for (i = 0; i < 8; i++)
 	{
-		OLED_WriteData(OLED_F8x16[Char - ' '][i]);			//显示上半部分内容
+		OLED_WriteData(OLED_F8x16[Char - ' '][i]); //显示上半部分内容
 	}
-	OLED_SetCursor((Line - 1) * 2 + 1, (Column - 1) * 8);	//设置光标位置在下半部分
+	OLED_SetCursor((Line - 1) * 2 + 1, (Column - 1) * 8); //设置光标位置在下半部分
 	for (i = 0; i < 8; i++)
 	{
-		OLED_WriteData(OLED_F8x16[Char - ' '][i + 8]);		//显示下半部分内容
+		OLED_WriteData(OLED_F8x16[Char - ' '][i + 8]); //显示下半部分内容
 	}
 }
 
@@ -163,10 +165,13 @@ void OLED_ShowChar(uint8_t Line, uint8_t Column, char Char)
   */
 void OLED_ShowString(uint8_t Line, uint8_t Column, char *String)
 {
-	uint8_t i;
-	for (i = 0; String[i] != '\0'; i++)
+	if (Sys_Para.enable_OLED)
 	{
-		OLED_ShowChar(Line, Column + i, String[i]);
+		uint8_t i;
+		for (i = 0; String[i] != '\0'; i++)
+		{
+			OLED_ShowChar(Line, Column + i, String[i]);
+		}
 	}
 }
 
@@ -194,10 +199,13 @@ uint32_t OLED_Pow(uint32_t X, uint32_t Y)
   */
 void OLED_ShowNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Length)
 {
-	uint8_t i;
-	for (i = 0; i < Length; i++)							
+	if (Sys_Para.enable_OLED)
 	{
-		OLED_ShowChar(Line, Column + i, Number / OLED_Pow(10, Length - i - 1) % 10 + '0');
+		uint8_t i;
+		for (i = 0; i < Length; i++)
+		{
+			OLED_ShowChar(Line, Column + i, Number / OLED_Pow(10, Length - i - 1) % 10 + '0');
+		}
 	}
 }
 
@@ -211,21 +219,24 @@ void OLED_ShowNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Length)
   */
 void OLED_ShowSignedNum(uint8_t Line, uint8_t Column, int32_t Number, uint8_t Length)
 {
-	uint8_t i;
-	uint32_t Number1;
-	if (Number >= 0)
+	if (Sys_Para.enable_OLED)
 	{
-		OLED_ShowChar(Line, Column, '+');
-		Number1 = Number;
-	}
-	else
-	{
-		OLED_ShowChar(Line, Column, '-');
-		Number1 = -Number;
-	}
-	for (i = 0; i < Length; i++)							
-	{
-		OLED_ShowChar(Line, Column + i + 1, Number1 / OLED_Pow(10, Length - i - 1) % 10 + '0');
+		uint8_t i;
+		uint32_t Number1;
+		if (Number >= 0)
+		{
+			OLED_ShowChar(Line, Column, '+');
+			Number1 = Number;
+		}
+		else
+		{
+			OLED_ShowChar(Line, Column, '-');
+			Number1 = -Number;
+		}
+		for (i = 0; i < Length; i++)
+		{
+			OLED_ShowChar(Line, Column + i + 1, Number1 / OLED_Pow(10, Length - i - 1) % 10 + '0');
+		}
 	}
 }
 
@@ -239,17 +250,20 @@ void OLED_ShowSignedNum(uint8_t Line, uint8_t Column, int32_t Number, uint8_t Le
   */
 void OLED_ShowHexNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Length)
 {
-	uint8_t i, SingleNumber;
-	for (i = 0; i < Length; i++)							
+	if (Sys_Para.enable_OLED)
 	{
-		SingleNumber = Number / OLED_Pow(16, Length - i - 1) % 16;
-		if (SingleNumber < 10)
+		uint8_t i, SingleNumber;
+		for (i = 0; i < Length; i++)
 		{
-			OLED_ShowChar(Line, Column + i, SingleNumber + '0');
-		}
-		else
-		{
-			OLED_ShowChar(Line, Column + i, SingleNumber - 10 + 'A');
+			SingleNumber = Number / OLED_Pow(16, Length - i - 1) % 16;
+			if (SingleNumber < 10)
+			{
+				OLED_ShowChar(Line, Column + i, SingleNumber + '0');
+			}
+			else
+			{
+				OLED_ShowChar(Line, Column + i, SingleNumber - 10 + 'A');
+			}
 		}
 	}
 }
@@ -264,11 +278,15 @@ void OLED_ShowHexNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Leng
   */
 void OLED_ShowBinNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Length)
 {
-	uint8_t i;
-	for (i = 0; i < Length; i++)							
+	if (Sys_Para.enable_OLED)
 	{
-		OLED_ShowChar(Line, Column + i, Number / OLED_Pow(2, Length - i - 1) % 2 + '0');
+		uint8_t i;
+		for (i = 0; i < Length; i++)
+		{
+			OLED_ShowChar(Line, Column + i, Number / OLED_Pow(2, Length - i - 1) % 2 + '0');
+		}
 	}
+
 }
 
 /**

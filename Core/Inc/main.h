@@ -44,12 +44,21 @@ typedef enum
 	S_NormRuning,//正常运行状态
 	S_TrackingCurve//跟踪曲线状态
 }SM_SysState;
-/*系统基本参数*/
+enum Manu
+{
+	id_setting = 0, fan_test, can_test, para_setting, count
+};
+/*系统基本参数
+ * 保存到flash
+ */
 typedef struct 
 {
+	uint32_t ID_Thisboard;		//本机ID
 	uint16_t Speed_MX_Fan;		//风机最大转速
 	SM_SysState RunMode;		//状态枚举。跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
+	enum Manu manu;				//菜单枚举。id设定、风机测试、can测试、参数设定
 	bool enable_send;			//向上位机同步数据？
+	bool enable_OLED;			//失能oled显示？
 	uint16_t timer_ctrl_T;		//控制定时器溢出时间/ms
 	uint16_t timer_fg_f;		//fg捕获定时器时钟/mhz
 	uint16_t timer_pwm_ARR;		//pwm定时器溢出值
@@ -64,11 +73,10 @@ typedef struct
 /*can相关参数*/
 typedef struct 
 {
-	uint16_t ID_Thisboard;		//本机ID
 	uint8_t PendingMsg;			//待解析数据量
-	bool is_Can_TXSec;			//
+	bool is_Can_TXSec;			//正在发送？
 }CANPara;
-/*can数据包*/
+/*一个can数据包*/
 typedef struct 
 {
 	uint32_t TxID;				//发信ID
@@ -96,7 +104,7 @@ typedef struct
 typedef struct
 {
 	bool enable_TrackCurve;		//失能跟踪
-	float curve_data[CURVE_SAMPLE_MX]; //跟踪曲线数据缓冲区
+	uint16_t curve_data[CURVE_SAMPLE_MX]; //跟踪曲线数据缓冲区
 	uint16_t sample_time;		//采样时间 ms
 	uint16_t phase[4];			//曲线相位 ms
 	uint16_t length;			//帧个数
@@ -168,10 +176,11 @@ void Error_Handler(void);
 #define TS 500						//采样周期
 //#define KTS (60.0f*DC_POWER/12)
 //#define KCCR (30*72000000)/2/8/10
-#define ID_ThisBoard 0x004			//本驱动板ID
+#define ID_ThisBoard 0x003			//本驱动板ID
 
 extern bool pid_enable[5];
 extern bool fan_enable[5];
+extern bool oled_init;
 extern SysPara Sys_Para;
 extern CtrlPara Ctrl_Para;
 extern CANPara CAN_Para;
@@ -181,6 +190,7 @@ extern TrackCurvePara TrackCurve_Para;
 //extern struct CTRL_PARA Ctrl_Para;
 //extern struct CAN_PARA Can_Para;
 //extern struct CAN_DATA CAN_Data;
+void State_Switch(SM_SysState state_next);
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

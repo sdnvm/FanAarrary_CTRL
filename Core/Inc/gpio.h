@@ -33,9 +33,6 @@ extern "C" {
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN Private defines */
-
-
-
 uint8_t Key_GetState(void);
 /* USER CODE END Private defines */
 

@@ -22,7 +22,6 @@
 
 /* USER CODE BEGIN 0 */
 extern void OLED_ShowNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Length);
-extern void send_computer(uint8_t cmd, uint8_t ch, void *data, uint8_t num);
 void set_rpm(uint8_t temp_cc, float rpm);
 
 /* USER CODE END 0 */
@@ -766,14 +765,10 @@ void set_rpm(const uint8_t temp_cc, const float rpm)
 {
   uint32_t comp = (uint32_t)((((double)Sys_Para.timer_pwm_ARR * (double)rpm ) / (double)Sys_Para.Speed_MX_Fan) + 0.5);
 	comp = (comp > Sys_Para.timer_pwm_ARR) ? Sys_Para.timer_pwm_ARR : comp;  //限幅
-	//send_computer(0x01, temp_cc, &comp, 4);     // 给通道 1 发送控制值
-	if(Ctrl_Para.enable_pid[0] == 0)
-	{
-		OLED_ShowNum(2, 13, (uint16_t)comp, 4);//显示算得的比较值
-	}
 	switch(temp_cc){
 			case 0:{
 				__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_2, (uint16_t)comp);//pwm1
+			  OLED_ShowNum(1, 13, (uint16_t)comp, 4);//显示算得的比较值
 			}break;
 			case 1:{
 				__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1, (uint16_t)comp);//pwm2

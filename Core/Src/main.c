@@ -40,6 +40,7 @@ CANPara CAN_Para;
 CANData CAN_Data;
 TrackCurvePara TrackCurve_Para;
 TrackCurveData TrackCurve_Data;
+bool oled_init = true;//第一次调用或更改模式时，重写oled屏幕背景内容
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -61,9 +62,10 @@ TrackCurveData TrackCurve_Data;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void Para_init(void); //初始化结构体参数
-void key_process_motortest(void); //按键扫描与处理函数
-void key_process_cantest(void); //按键扫描与处理函数
+static void Para_init(void); //初始化结构体参数
+static void key_process_idsetting(uint8_t keystate); //按键扫描与处理函数
+static void key_process_motortest(uint8_t keystate); //按键扫描与处理函数
+static void key_process_cantest(uint8_t keystate); //按键扫描与处理函数
 void State_Switch(SM_SysState state_next);//系统运行状态切换
 /* USER CODE END PFP */
 
@@ -96,6 +98,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -121,29 +124,8 @@ int main(void)
 
 	uint16_t curve_sum_receveied;
 	extern int capture_end_flag;
+	uint8_t KeyState = 0;
 
-	//OLED_ShowString(1, 1, "RxID:");
-	//OLED_ShowString(2, 1, "Data:");
-	//OLED_ShowString(4, 1, "TxID:");
-	OLED_ShowString(3, 5, "|");
-	OLED_ShowString(3, 10, "|");
-	OLED_ShowString(4, 6, "|");
-	OLED_ShowString(4, 11, "|");
-	OLED_ShowNum(4, 12, (uint16_t)250, 3);
-	OLED_ShowString(4, 15, "ms");
-	OLED_ShowNum(4, 7, (Sys_Para.Speed_MX_Fan / 10),4);
-	OLED_ShowNum(3, 1, (uint32_t)(pid_para[3].Kp*1000),4);
-	OLED_ShowNum(3, 6, (uint32_t)(pid_para[3].Ki*1000),4);
-	OLED_ShowNum(3, 11, (uint32_t)(pid_para[3].Kd*1000),4);
-	//can调试用的
-	OLED_ShowString(1, 4, "|");
-	OLED_ShowString(1, 8, "|");
-	OLED_ShowString(1, 10, "|");
-	OLED_ShowString(1, 1,"rid");
-	OLED_ShowString(1, 5, "tid");
-	OLED_ShowString(1, 9, "c");
-	OLED_ShowString(1, 11, "d");
-	OLED_ShowString(2, 1,"data(hex)");
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -154,8 +136,25 @@ int main(void)
 		{
 			cacul_sin_params();
 		}
-		key_process_cantest();
-		//key_process_motortest();
+		KeyState = Key_GetState();
+		switch (Sys_Para.manu)
+		{
+			case id_setting:
+			key_process_idsetting(KeyState);
+			break;
+			case fan_test:
+			key_process_motortest(KeyState);
+			break;
+			case can_test:
+			key_process_cantest(KeyState);
+			break;
+			case para_setting:
+			//todo:参数设定
+			break;
+			default:
+			break;
+		}
+
 		/* FIFO0扫描接收 */
 		CAN_Para.PendingMsg = HAL_CAN_GetRxFifoFillLevel(&hcan, CAN_RX_FIFO0);
 		while (CAN_Para.PendingMsg > 0)
@@ -163,14 +162,17 @@ int main(void)
 			if (HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &CAN_Data.can_RxHeader, CAN_Data.RxData) == HAL_OK) //接收成功
 			{
 				uint16_t cmd_can; //指令类型
-				OLED_ShowHexNum(1, 5, CAN_Data.can_RxHeader.StdId, 3);//打印id
-				OLED_ShowNum(1, 9, CAN_Data.can_RxHeader.DLC , 1);//打印DLC
-				uint32_t RawData;//原始数据
-				memcpy(&RawData, &CAN_Data.RxData[0], 4);
-				OLED_ShowHexNum(2, 1, RawData, 8);//打印原始data1
-				memcpy(&RawData, &CAN_Data.RxData[4], 4);
-				OLED_ShowHexNum(2, 9, RawData, 8);//打印原始data2
-				//HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				if (Sys_Para.manu == can_test)
+				{
+					OLED_ShowHexNum(1, 1, CAN_Data.can_RxHeader.StdId, 3);//打印id
+					//OLED_ShowNum(1, 9, CAN_Data.can_RxHeader.DLC , 1);//打印DLC
+					/*uint32_t RawData;//原始数据
+					memcpy(&RawData, &CAN_Data.RxData[0], 4);
+					OLED_ShowHexNum(2, 1, RawData, 8);//打印原始data1
+					memcpy(&RawData, &CAN_Data.RxData[4], 4);
+					OLED_ShowHexNum(2, 9, RawData, 8);//打印原始data2*/
+				}
+				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 				switch (CAN_Data.can_RxHeader.StdId)
 				{
 				case 0x001: //广播的复位、启停
@@ -217,50 +219,39 @@ int main(void)
 						//todo:数据保存置flash
 						break;
 					case 0x008: //上传一次本机状态
-					//todo：上传本机当前状态
-					case 0x009: //停止上传
-					case 0x00A://开始上传转速
-						Sys_Para.enable_send =  cmd_can - 9;
+						MyCAN_Transmit_enum(TX_SYSPara);
+					case 0x009: //使能上传转速
+						Sys_Para.enable_send = !Sys_Para.enable_send;
+					case 0x00A://使能oled显示
+						Sys_Para.enable_OLED = !Sys_Para.enable_OLED;
 						break;
 					default:
 						break;
 					}
 					break;
-				case 0x03://广播目标转速
-				case (ID_ThisBoard << 4) | 0x03: //本机目标转速
-					static uint8_t rxcount_rpm = 0;//接收到的帧个数
-					if (rxcount_rpm == 0) //第一帧
+				case 0x03: //广播目标转速首帧
+				case (ID_ThisBoard << 4) | 0x03: //本机目标转速首帧
+					for (int i = 0; i < 2; i++)
 					{
-						for (int i = 0; i < 2; i++)
-						{
-							memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 4], 4);
-							OLED_ShowNum(3, 1 + i * 4, Ctrl_Para.rpm_want[i], 4);
-						}
+						memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 4], 4);
 					}
-					else //第二帧
+					break;
+				case 0x04: //广播目标转速尾帧
+				case (ID_ThisBoard << 4) | 0x04: //本机目标转速尾帧
+					for (int i = 0; i < 2; i++)
 					{
-						for (int i = 2; i < 4; i++)
-						{
-							memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 4], 4);
-							OLED_ShowNum(3, 1 + i * 4, Ctrl_Para.rpm_want[i], 4);
-						}
+						memcpy(&Ctrl_Para.rpm_want[i + 2], &CAN_Data.RxData[i * 4], 4);
 					}
-					if (rxcount_rpm >= 1)//接收到两帧
+					for (int i = 0; i < 3; i++)
 					{
-						rxcount_rpm = 0;
-						OLED_ShowNum(3, 1, (uint16_t)(pid_para[0].Kp * 1000.0f), 4);
-						OLED_ShowNum(3, 6, (uint16_t)(pid_para[0].Ki * 1000.0f), 4);
-						OLED_ShowNum(3, 11, (uint16_t)(pid_para[0].Kd * 1000.0f), 4);
-						OLED_ShowString(3, 5, "|");
-						OLED_ShowString(3, 10, "|");
+						OLED_ShowNum(2, 1 + i * 5, Ctrl_Para.rpm_want[i] * 10, 5);
 					}
-					rxcount_rpm += 1;
 					break;
 				case (ID_ThisBoard << 4) | 0x0A: //跟踪曲线相位
 					for (int i = 0; i < 4; i++)
 					{
 						memcpy(&TrackCurve_Para.phase[i], &CAN_Data.RxData[i * 2], 2);
-						OLED_ShowNum(3, 1 + i * 4, TrackCurve_Para.phase[i], 4);
+						OLED_ShowNum(2, 1 + i * 4, TrackCurve_Para.phase[i], 4);
 					}
 					break;
 				default:
@@ -274,13 +265,14 @@ int main(void)
 				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 				HAL_Delay(500);
 				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				OLED_ShowString(4, 1, "f1err");
 			}
 			CAN_Para.PendingMsg--;
 		}
 
 		/* FIFO1扫描接收 */
 		CAN_Para.PendingMsg = HAL_CAN_GetRxFifoFillLevel(&hcan, CAN_RX_FIFO1);
-		if (CAN_Para.PendingMsg > 0)
+		while (CAN_Para.PendingMsg > 0)
 		{
 			if (HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO1, &CAN_Data.can_RxHeader, CAN_Data.RxData) == HAL_OK) //接收成功
 			{
@@ -313,8 +305,8 @@ int main(void)
 				case 0x008: //curve尾帧
 					{
 						//数据完整性判断
-						if (TrackCurve_Para.num_data_received - TrackCurve_Para.num_data == 1 | TrackCurve_Para.
-							num_data_received == TrackCurve_Para.num_data)
+						if ((TrackCurve_Para.num_data_received - TrackCurve_Para.num_data == 1) || (TrackCurve_Para.
+							num_data_received == TrackCurve_Para.num_data))
 						{
 							TrackCurve_Para.is_assembling = false;
 						}
@@ -328,7 +320,8 @@ int main(void)
 					{
 						//memcpy(&, &can_RxData[2], 2);//T采样
 						static uint8_t rxcount_pid = 0;//接收到的帧个数
-						if (rxcount_pid == 0) //第一帧
+						rxcount_pid += 1;
+						if (rxcount_pid == 1) //第一帧
 						{
 							for (int i = 0; i < 4; i++)
 							{
@@ -346,16 +339,14 @@ int main(void)
 								HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 							}
 						}
-						if (rxcount_pid >= 1)//接收到两帧
+						if (rxcount_pid >= 2)//接收到两帧
 						{
 							rxcount_pid = 0;
-							OLED_ShowNum(3, 1, (uint16_t)(pid_para[0].Kp * 1000.0f), 4);
-							OLED_ShowNum(3, 6, (uint16_t)(pid_para[0].Ki * 1000.0f), 4);
-							OLED_ShowNum(3, 11, (uint16_t)(pid_para[0].Kd * 1000.0f), 4);
-							OLED_ShowString(3, 5, "|");
-							OLED_ShowString(3, 10, "|");
+							OLED_ShowString(2, 5, "|    |");
+							OLED_ShowNum(2, 1, (uint16_t)(pid_para[0].Kp * 1000.0f), 4);
+							OLED_ShowNum(2, 6, (uint16_t)(pid_para[0].Ki * 1000.0f), 4);
+							OLED_ShowNum(2, 11, (uint16_t)(pid_para[0].Kd * 1000.0f), 4);
 						}
-						rxcount_pid += 1;
 						break;
 					}
 				default:
@@ -364,6 +355,7 @@ int main(void)
 			}
 			else //接收错误
 			{
+				OLED_ShowString(4, 1, "f2err");
 				HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 				HAL_Delay(500);
 				HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
@@ -423,9 +415,12 @@ void SystemClock_Config(void)
 //系统参数配置
 void Para_init(void)
 {
+	Sys_Para.ID_Thisboard = 0x00000003;
 	Sys_Para.Speed_MX_Fan = 16500;
 	Sys_Para.enable_send = false;
+	Sys_Para.enable_OLED = true;
 	Sys_Para.RunMode = S_Wait;
+	Sys_Para.manu = id_setting;
 	Sys_Para.timer_ctrl_T = 250;
 	Sys_Para.timer_fg_f = 12;//mhz
 	Sys_Para.timer_pwm_ARR = 4714;
@@ -435,36 +430,33 @@ void Para_init(void)
 	memset(&Ctrl_Para.rpm_want, 0, sizeof(Ctrl_Para.rpm_want));
 
 	/*CAN相关变量*/
-	//ID_ThisBoard去main.h里改
-	CAN_Para.ID_Thisboard = 0x001;
 	CAN_Para.PendingMsg = 0;
 	/*CAN_Data.TxID = ID_ThisBoard << 4;
-	uint8_t temp_txid[8] = {0x11, 0x22, 0x33, 0x44};
-	memcpy(CAN_Data.TxData, temp_txid, sizeof(CAN_Data.TxData));*/
 	/*跟踪曲线相关变量*//*系统相关变量*/
 }
 //状态切换
 void State_Switch(SM_SysState state_next)
 {
+	HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 	switch (state_next)
 	{
 	case S_Wait://停机等待，进行数据接收等
-		OLED_ShowString(4, 1, "wait ");
-		OLED_ShowNum(4, 5, Ctrl_Para.enable_pid[0], 1);//0==开环，1==闭环
-		memset(Ctrl_Para.enable_fan, false, sizeof(Ctrl_Para.enable_fan));
+		memset(Ctrl_Para.enable_fan, false, sizeof(Ctrl_Para.enable_fan));//失能
 		for (int i = 0; i < 4; i++)
 		{
-			set_rpm_incloseloopmode(i, 0);//停机
+			set_rpm_incloseloopmode(i, 0);//目标转速置0
 		}
+		OLED_ShowString(4, 1, "wait ");
+		OLED_ShowNum(4, 5, Ctrl_Para.enable_pid[0], 1);//0==开环，1==闭环
 		break;
 	case S_NormRuning://风机正常运行-开闭环。要提前配置rpm_want&pid
 		OLED_ShowString(4, 1, "norm ");
 		OLED_ShowNum(4, 5, Ctrl_Para.enable_pid[0], 1);//0==开环，1==闭环
 		for (int i = 0; i < 4; i++)
 		{
-			set_rpm_incloseloopmode(i, (float)Ctrl_Para.rpm_want[i]);
+			set_rpm_incloseloopmode(i, (float)Ctrl_Para.rpm_want[i]);//传入目标转速
 		}
-		memset(Ctrl_Para.enable_fan, true, sizeof(Ctrl_Para.enable_fan));
+		memset(Ctrl_Para.enable_fan, true, sizeof(Ctrl_Para.enable_fan));//失能风机
 		break;
 	case S_TrackingCurve://跟踪曲线模式
 		OLED_ShowString(4, 1, "track");
@@ -474,133 +466,140 @@ void State_Switch(SM_SysState state_next)
 	}
 	Sys_Para.RunMode = state_next;
 }
-
-/*按键处理 —— 电机测试*/
-void key_process_motortest(void)
+/*按键处理 —— 设定本机id*/
+void key_process_idsetting(uint8_t keystate)
 {
-	static uint8_t CH = 0;
-	uint8_t KeyState = 0;
-	KeyState = Key_GetState();
-	switch (KeyState)
+	if (oled_init)
 	{
-	case SW2_SINGLE_CLICK:
-		memset(Ctrl_Para.enable_fan, 0, sizeof(Ctrl_Para.enable_fan));
+		OLED_Clear();
+		OLED_ShowString(1, 1, "MAX:");OLED_ShowString(1, 10, "| ID:");
+		OLED_ShowHexNum(1, 15, Sys_Para.ID_Thisboard, 2);
+		OLED_ShowNum(1, 5, Sys_Para.Speed_MX_Fan, 5);
+		OLED_ShowString(2, 5, "|    |");
+		OLED_ShowNum(2, 1, (uint32_t)(pid_para[3].Kp*1000),4);
+		OLED_ShowNum(2, 6, (uint32_t)(pid_para[3].Ki*1000),4);
+		OLED_ShowNum(2, 11, (uint32_t)(pid_para[3].Kd*1000),4);
+		OLED_ShowString(4, 1, "wait");OLED_ShowString(4, 6, "|S_id|");OLED_ShowString(4, 15, "ms");
+		OLED_ShowNum(4, 12, Sys_Para.timer_ctrl_T, 3);
+		oled_init = false;
+	}
+	switch (keystate)
+	{
+	case SW2_SINGLE_CLICK: //+1
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		Sys_Para.ID_Thisboard += 1;
+		break;
+	case SW2_LONG_PRESS: //-1
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		Sys_Para.ID_Thisboard += 10;
+		break;
+	case SW3_SINGLE_CLICK: //+10
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		if (Sys_Para.ID_Thisboard >= 1)
+		{
+			Sys_Para.ID_Thisboard -= 1;
+		}
+		else
+		{
+			break;
+		}
+		break;
+	case SW3_LONG_PRESS: //-10
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		if (Sys_Para.ID_Thisboard >= 10)
+		{
+			Sys_Para.ID_Thisboard -= 10;
+		}
+		else
+		{
+			break;
+		}
+		break;
+	case SW3_LONGLONG_PRESS: //保存到flash
+		break;
+	default:
+		return;
+	}
+	OLED_ShowHexNum(1, 15, Sys_Para.ID_Thisboard, 2);
+}
+/*按键处理 —— 电机测试*/
+void key_process_motortest(uint8_t keystate)
+{
+	if (oled_init)
+	{
+		OLED_Clear();
+		OLED_ShowString(4, 1, "wait |Tctr|");
+		oled_init = false;
+	}
+	static uint8_t CH = 0;
+	switch (keystate)
+	{
+	case SW2_SINGLE_CLICK://停机
+		State_Switch(S_Wait);
 		for (int i = 0; i < 4; i++)
 		{
-			CH = i;
-			set_rpm(i, (float)Ctrl_Para.rpm_want[i]);
-			pid_reset(i, Ctrl_Para.rpm_want[i]);
+			Ctrl_Para.rpm_want[i] = 0;
+			OLED_ShowNum(2, 1 + i * 4, (uint32_t)Ctrl_Para.rpm_want[i], 4);
 		}
-		CH = 1;
-		OLED_ShowNum(CH, 1, Ctrl_Para.rpm_want[CH - 1], 5);
-		OLED_ShowString(4, 1, "Open");
-		HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_2);
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
-	case SW2_LONG_PRESS:
-		CH = 0;
-		Ctrl_Para.rpm_want[CH] = Ctrl_Para.rpm_want[CH] + 1000;
-		Ctrl_Para.enable_fan[CH + 1] = 1;
-		Ctrl_Para.enable_fan[0] = 1;
-		set_rpm(CH, (float)Ctrl_Para.rpm_want[CH]);
-		pid_reset(CH, Ctrl_Para.rpm_want[CH]);
-		OLED_ShowNum(1, 1, Ctrl_Para.rpm_want[CH], 5);
-		HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_2);
-		break;
-	case SW3_SINGLE_CLICK: //切换开闭环
+	case SW2_LONG_PRESS: //开闭环切换
 		{
-			static uint8_t mode_control = 0;
-			if (mode_control == 0)
-			{
-				mode_control = 1;
-				CH = 1;
-				pid_reset(CH, Ctrl_Para.rpm_want[CH - 1]);
-				CH = 2;
-				pid_reset(CH, Ctrl_Para.rpm_want[CH - 1]);
-				CH = 3;
-				pid_reset(CH, Ctrl_Para.rpm_want[CH - 1]);
-				CH = 4;
-				pid_reset(CH, Ctrl_Para.rpm_want[CH - 1]);
-				Ctrl_Para.enable_pid[0] = 1;
-				OLED_ShowString(4, 1, "Close");
-			}
-			else
-			{
-				mode_control = 0;
-				CH = 1;
-				pid_reset(CH, Ctrl_Para.rpm_want[CH]);
-				CH = 2;
-				pid_reset(CH, Ctrl_Para.rpm_want[CH]);
-				CH = 3;
-				pid_reset(CH, Ctrl_Para.rpm_want[CH - 1]);
-				CH = 4;
-				pid_reset(CH, Ctrl_Para.rpm_want[CH - 1]);
-				Ctrl_Para.enable_pid[0] = 0;
-				OLED_ShowString(4, 1, "Open");
-			}
-			HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_2);
+			static bool mode_control = 0;
+			State_Switch(S_Wait); //停机
+			Ctrl_Para.enable_pid[0] = mode_control; //pid总使能位赋值
+			mode_control = !mode_control;
+			State_Switch(S_Wait); //停机，并更新开闭环
+			break;
+			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		}
+		break;
+	case SW3_SINGLE_CLICK: //转速-
+		for (int i = 0; i < 4; i++)
+		{
+			Ctrl_Para.rpm_want[i] -= 1000;
+			OLED_ShowNum(2, 1 + i * 4, (uint32_t)Ctrl_Para.rpm_want[i], 4);
+		}
+		State_Switch(S_NormRuning);
+		HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 		break;
 	case SW3_LONG_PRESS:
+		for (int i = 0; i < 4; i++)
 		{
-			static uint8_t mode_fan = 0;
-			if (mode_fan == 0)
-			{
-				mode_fan = 1;
-				Sys_Para.Speed_MX_Fan = 12500;
-			}
-			else
-			{
-				mode_fan = 0;
-				Sys_Para.Speed_MX_Fan = 16500;
-			}
-			OLED_ShowNum(4, 7, (Sys_Para.Speed_MX_Fan / 10), 4);
-			HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_2);
+			Ctrl_Para.rpm_want[i] += 1000;
+			OLED_ShowNum(2, 1 + i * 4, (uint32_t)Ctrl_Para.rpm_want[i], 4);
 		}
+		State_Switch(S_NormRuning);
+		HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 		break;
 	default:
 		break;
 	}
 }
-
 /*按键处理 —— CAN通讯测试*/
-void key_process_cantest(void)
+void key_process_cantest(uint8_t keystate)
 {
-	uint8_t KeyState = 0;
-	float temp_cantx = 122.2;
-	uint32_t temp_cantx2 = 255;
-	KeyState = Key_GetState();
-	switch (KeyState)
+	if (oled_init)
+	{
+		OLED_Clear();
+		OLED_ShowString(1, 1, " id|");
+		OLED_ShowString(2, 1,"---data(hex)----");
+		OLED_ShowString(4, 1, "wait |Tcan|");
+		oled_init = false;
+	}
+	float temp_cantx = 15222.2;
+	float temp_cantx2 = 8990.1;
+	switch (keystate)
 	{
 	case SW2_SINGLE_CLICK:
-		CAN_Data.TxID = 0x00000000; //初始化为0
-		CAN_Data.TxID |= ((ID_ThisBoard & 0x7F) << 4);
-		CAN_Data.TxID |= (0x0E & 0x0F); //上传第一组转速数据
-		memcpy(&CAN_Data.TxData[0], &temp_cantx, 4);
-		memcpy(&CAN_Data.TxData[4], &temp_cantx2, 4);
-		MyCAN_Transmit(CAN_Data.TxID, CAN_Data.TxData, 8);
-		OLED_ShowHexNum(4, 6, CAN_Data.TxID, 3);
-		OLED_ShowHexNum(3, 1, CAN_Data.TxData[4], 1);
-		OLED_ShowHexNum(3, 2, CAN_Data.TxData[5], 1);
-		OLED_ShowHexNum(3, 3, CAN_Data.TxData[6], 1);
-		OLED_ShowHexNum(3, 4, CAN_Data.TxData[7], 1);
+		MyCAN_Transmit_RPM(&temp_cantx, &temp_cantx2, 1);
+		MyCAN_Transmit_RPM(&temp_cantx, &temp_cantx2, 2);
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW2_LONG_PRESS:
-		CAN_Data.TxID = 0x00000000;
-		CAN_Data.TxID |= ((ID_ThisBoard & 0x7F) << 4);
-		CAN_Data.TxID |= (0x0E & 0x0F); //上传第一组转速数据
-		MyCAN_Transmit(CAN_Data.TxID, CAN_Data.TxData, 8);
-		OLED_ShowHexNum(4, 6, CAN_Data.TxID, 3);
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		HAL_Delay(1000);
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW3_SINGLE_CLICK:
-		CAN_Data.TxID = 0x00000000;
-		CAN_Data.TxID |= (0x7F << 4);
-		CAN_Data.TxID |= (0x0A & 0x0F); //请求重发跟踪曲线
-		MyCAN_Transmit(CAN_Data.TxID, CAN_Data.TxData, 0);
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		HAL_Delay(1000);
+		MyCAN_Transmit_enum(TX_Resend_Track);
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW3_LONG_PRESS:

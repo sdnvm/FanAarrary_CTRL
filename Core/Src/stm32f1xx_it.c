@@ -373,39 +373,31 @@ void TIM6_IRQHandler(void)
 		switch (chanel)
 		{
 		case 0:
-			{
-				//CCR_NUM = overflow_num1*65535+__HAL_TIM_GET_COMPARE(&htim1,TIM_CHANNEL_1);
-				//HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
-				//HAL_TIM_Base_Start_IT(&htim2);
-				//HAL_TIM_IC_Stop_IT(&htim1,TIM_CHANNEL_1);
-				CCR_NUM = (OVERFLOW_LAST1 * 65535 + IC_1) - IC_last1;
-				/*if(CCR_NUM > 2000000){//超时处理
-					fan_enable[c] = 0;
-					pid_reset(c,0);
-					pid_enable[0] = 0;
-					set_rpm(c,0);					
-					c+=1;	
-					return;
-				}*/
-			}
+			//CCR_NUM = overflow_num1*65535+__HAL_TIM_GET_COMPARE(&htim1,TIM_CHANNEL_1);
+			//HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_1);
+			//HAL_TIM_Base_Start_IT(&htim2);
+			//HAL_TIM_IC_Stop_IT(&htim1,TIM_CHANNEL_1);
+			CCR_NUM = (OVERFLOW_LAST1 * 65535 + IC_1) - IC_last1;
+			/*if(CCR_NUM > 2000000){//超时处理
+				fan_enable[c] = 0;
+				pid_reset(c,0);
+				pid_enable[0] = 0;
+				set_rpm(c,0);
+				c+=1;
+				return;
+			}*/
 			break;
 		case 1:
-			{
-				//	HAL_TIM_IC_Start_IT(&htim1,TIM_CHANNEL_1);
-				//	HAL_TIM_IC_Stop_IT(&htim2,TIM_CHANNEL_1);
-				//HAL_TIM_Base_Stop_IT(&htim2);				
-				CCR_NUM = (OVERFLOW_LAST2 * 65535 + IC_2) - IC_last2;
-			}
+			//	HAL_TIM_IC_Start_IT(&htim1,TIM_CHANNEL_1);
+			//	HAL_TIM_IC_Stop_IT(&htim2,TIM_CHANNEL_1);
+			//HAL_TIM_Base_Stop_IT(&htim2);
+			CCR_NUM = (OVERFLOW_LAST2 * 65535 + IC_2) - IC_last2;
 			break;
 		case 2:
-			{
-				CCR_NUM = (OVERFLOW_LAST3 * 65535 + IC_3) - IC_last3;
-			}
+			CCR_NUM = (OVERFLOW_LAST3 * 65535 + IC_3) - IC_last3;
 			break;
 		case 3:
-			{
-				CCR_NUM = (OVERFLOW_LAST4 * 65535 + IC_4) - IC_last4;
-			}
+			CCR_NUM = (OVERFLOW_LAST4 * 65535 + IC_4) - IC_last4;
 			break;
 		default:
 			break;

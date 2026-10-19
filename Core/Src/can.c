@@ -185,7 +185,47 @@ void MyCAN_Transmit(uint32_t ID, uint8_t* Data, uint32_t Length)
 		}
 	}
 }
-
+/*上传转速数据
+ * c2 == 0|2时id为0E，1|3时，id为0F
+ */
+void MyCAN_Transmit_RPM(float* rpm_r, float* rpm_c, const uint8_t c2)
+{
+	if (Sys_Para.enable_send == 1)
+	{
+		uint32_t txid = 0x00000000; //id
+		uint8_t txdata[8]; //data(一帧)
+		txid |= ((ID_ThisBoard & 0x7F) << 4);
+		if (c2 == 0 || c2 == 2)
+		{
+			txid |= 0x0E & 0x0F; //上传A转速数据
+		}
+		else
+		{
+			txid |= 0x0F; //上传B转速数据
+			memcpy(&txdata[0], rpm_r, 4);//实际值
+			memcpy(&txdata[4], rpm_c, 4);//控制值
+			MyCAN_Transmit(txid, txdata, 8);
+		}
+	}
+}
+/*按类型直接上传数据*/
+void MyCAN_Transmit_enum(TXType TX_Tpye)
+{
+	switch (TX_Tpye)
+	{
+	case TX_Heartbeat://上传心跳包
+	 	break;
+	case TX_SYSPara://上传系统参数
+		//todo：上传本机当前状态
+		break;
+	case TX_Resend_Track://请求重新下方跟踪曲线数据
+		uint8_t request_type = 1;
+		MyCAN_Transmit(0x07FD, &request_type, 1);
+		break;
+	default:
+		break;
+	}
+}
 /*fifo0收信中断回调*/
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
 {

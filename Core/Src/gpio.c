@@ -21,6 +21,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "gpio.h"
 
+#include "OLED.h"
+
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
@@ -29,7 +31,6 @@
 /* Configure GPIO                                                             */
 /*----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
-
 /* USER CODE END 1 */
 
 /** Configure pins as
@@ -79,17 +80,35 @@ uint8_t Key_GetState(void)
 		HAL_Delay(15); //消抖
 		if (HAL_GPIO_ReadPin(GPIOA,SW2_Pin) == 1) //非扰动
 		{
+			bool key_timeout_count = false;
 			PressDuration = HAL_GetTick();
-			while (HAL_GPIO_ReadPin(GPIOA, SW2_Pin) == 1); //等待松手
-			PressDuration = HAL_GetTick() - PressDuration; //记录按下时长
-			HAL_Delay(15); //消抖
-			if (PressDuration < 500)
+			while (HAL_GPIO_ReadPin(GPIOA, SW2_Pin) == 1) //等待松手
 			{
-				Keystate = SW2_SINGLE_CLICK; //单击
+				if ((key_timeout_count == false) && ((HAL_GetTick() - PressDuration) >= 2200))
+				{
+					key_timeout_count = true;
+					OLED_ShowString(4, 7, "NEXT");
+				}
+				if ((HAL_GetTick() - PressDuration) >= 8000)
+				{
+					break;
+				}
 			}
-			else
+			PressDuration = HAL_GetTick() - PressDuration; //记录按下时长
+			if (PressDuration < 400)//单击
 			{
-				Keystate = SW2_LONG_PRESS; //长按
+				Keystate = SW2_SINGLE_CLICK;
+			}
+			else if (PressDuration < 2000)//长按
+			{
+				Keystate = SW2_LONG_PRESS;
+			}
+			else//超级长按,更改按键模式
+			{
+				State_Switch(S_Wait);
+				Sys_Para.manu = (enum Manu)(Sys_Para.manu + 1) % count;
+				oled_init = true;//允许重写屏幕背景
+				Keystate = SW2_LONGLONG_PRESS;
 			}
 		}
 	}
@@ -99,16 +118,26 @@ uint8_t Key_GetState(void)
 		if (HAL_GPIO_ReadPin(GPIOA,SW3_Pin) == 1) //非扰动
 		{
 			PressDuration = HAL_GetTick();
-			while (HAL_GPIO_ReadPin(GPIOA, SW3_Pin) == 1); //等待松手
+			while (HAL_GPIO_ReadPin(GPIOA, SW3_Pin) == 1) //等待松手
+			{
+				if ((HAL_GetTick() - PressDuration) >= 6000)
+				{
+					break;
+				}
+			}
 			PressDuration = HAL_GetTick() - PressDuration; //记录按下时长
 			HAL_Delay(15); //消抖
 			if (PressDuration < 500)
 			{
 				Keystate = SW3_SINGLE_CLICK; //单击
 			}
-			else
+			else if (PressDuration < 2000)
 			{
 				Keystate = SW3_LONG_PRESS; //长按
+			}
+			else
+			{
+				Keystate = SW3_LONGLONG_PRESS;//超级长按
 			}
 		}
 	}
