@@ -43,32 +43,44 @@ typedef enum
 	S_RecevData,//接收长数据状态
 	S_NormRuning,//正常运行状态
 	S_TrackingCurve//跟踪曲线状态
-}SM_SysState;
+}SM_SysRunMode;
 enum Manu
 {
-	id_setting = 0, fan_test, can_test, para_setting, count
+	id_setting = 0,
+	fan_test,
+	can_test,
+	para_setting,
+	count
 };
+/*系统动态参数
+ * 不保存到flash
+ */
+typedef struct
+{
+	enum Manu manu;				//菜单枚举。id设定、风机测试、can测试、参数设定
+	SM_SysRunMode RunMode;		//状态枚举。跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
+}SysState;
 /*系统基本参数
  * 保存到flash
  */
 typedef struct 
 {
 	uint32_t ID_Thisboard;		//本机ID
-	uint16_t Speed_MX_Fan;		//风机最大转速
-	SM_SysState RunMode;		//状态枚举。跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
-	enum Manu manu;				//菜单枚举。id设定、风机测试、can测试、参数设定
-	bool enable_send;			//向上位机同步数据？
-	bool enable_OLED;			//失能oled显示？
 	uint16_t timer_ctrl_T;		//控制定时器溢出时间/ms
 	uint16_t timer_fg_f;		//fg捕获定时器时钟/mhz
-	uint16_t timer_pwm_ARR;		//pwm定时器溢出值
+	//uint16_t Speed_MX_Fan;	//风机最大转速
+	//uint16_t timer_pwm_ARR;	//pwm定时器溢出值
+	bool enable_send;			//使能向上位机同步数据？
+	bool enable_OLED;			//使能OLED显示？
+	bool enable_key;			//使能按键？
+	bool enable_pid;			//使能pid？
 }SysPara;
 /*控制器相关参数*/
 typedef struct 
 {
-	float rpm_want[4];		//目标转速
-	bool enable_pid[5];			//pid开关状态，[0]为开关，后几个由程序控制，别直接写1
+	float rpm_want[4];			//目标转速
 	bool enable_fan[5];			//风机开关状态，[0]为总开关,后几个为具体开关
+	bool enable_pid[5];			//pid开关状态，[0]为开关，后几个由程序控制，别直接写1
 }CtrlPara;
 /*can相关参数*/
 typedef struct 
@@ -96,14 +108,12 @@ typedef struct
 	uint16_t buffer_byte;		//缓冲区字节数
 	bool is_assembling;			//正在接收曲线数据？
 	bool start_cacul;			//开始计算
-
 	//bool is_received[CURVE_SAMPLE_MX];//成功收到数据？
 }TrackCurvePara;
 #define CURVE_SAMPLE_MX 256			//拟合曲线缓冲区大小
 /*跟踪曲线数据*/
 typedef struct
 {
-	bool enable_TrackCurve;		//失能跟踪
 	uint16_t curve_data[CURVE_SAMPLE_MX]; //跟踪曲线数据缓冲区
 	uint16_t sample_time;		//采样时间 ms
 	uint16_t phase[4];			//曲线相位 ms
@@ -154,10 +164,6 @@ void Error_Handler(void);
 #define CAN_RX_GPIO_Port GPIOA
 #define CAN_TX_Pin GPIO_PIN_12
 #define CAN_TX_GPIO_Port GPIOA
-#define UART3_TX_Pin GPIO_PIN_10
-#define UART3_TX_GPIO_Port GPIOC
-#define UART3_RX_Pin GPIO_PIN_11
-#define UART3_RX_GPIO_Port GPIOC
 #define FG1_Pin GPIO_PIN_8
 #define FG1_GPIO_Port GPIOB
 
@@ -171,16 +177,22 @@ void Error_Handler(void);
 #define SW3_LONG_PRESS 32
 #define SW3_LONGLONG_PRESS 33
 
-#define START_RPM 0					//开机风速
-#define DC_POWER 12					//电机供电电压
-#define TS 500						//采样周期
+/*！！要手动改的宏！！*/
+#define SELECTER_IO_FAN 2				//1是inlet，2是outlet
+#if (SELECTER_IO_FAN == 1)
+#define FANSPEED_MAX 20000		//输入端风扇最大转速
+#elif (SELECTER_IO_FAN == 2)
+	#define FANSPEED_MAX 17500	//输出端风扇最大转速
+#endif
+
+#define PWM_ARR 4130					//pwm寄存器溢出值
+#define RPM_TO_ARR (double)PWM_ARR/FANSPEED_MAX	//转速转arr值
+
 //#define KTS (60.0f*DC_POWER/12)
 //#define KCCR (30*72000000)/2/8/10
-#define ID_ThisBoard 0x003			//本驱动板ID
+//#define ID_ThisBoard 0x003			//本驱动板ID
 
-extern bool pid_enable[5];
-extern bool fan_enable[5];
-extern bool oled_init;
+extern SysState Sys_State;
 extern SysPara Sys_Para;
 extern CtrlPara Ctrl_Para;
 extern CANPara CAN_Para;
@@ -190,7 +202,7 @@ extern TrackCurvePara TrackCurve_Para;
 //extern struct CTRL_PARA Ctrl_Para;
 //extern struct CAN_PARA Can_Para;
 //extern struct CAN_DATA CAN_Data;
-void State_Switch(SM_SysState state_next);
+void RunMode_Switch(SM_SysRunMode run_mode);
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

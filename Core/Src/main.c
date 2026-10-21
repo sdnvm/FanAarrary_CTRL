@@ -20,7 +20,6 @@
 #include "main.h"
 #include "can.h"
 #include "tim.h"
-#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -28,12 +27,14 @@
 #include "bsp_pid.h"
 #include "control.h"
 #include "sin_control.h"
+#include "save_flash.h"
 #include <string.h>
 #include "OLED.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+SysState Sys_State;
 SysPara Sys_Para;
 CtrlPara Ctrl_Para;
 CANPara CAN_Para;
@@ -66,7 +67,7 @@ static void Para_init(void); //初始化结构体参数
 static void key_process_idsetting(uint8_t keystate); //按键扫描与处理函数
 static void key_process_motortest(uint8_t keystate); //按键扫描与处理函数
 static void key_process_cantest(uint8_t keystate); //按键扫描与处理函数
-void State_Switch(SM_SysState state_next);//系统运行状态切换
+//void RunMode_Switch(SM_SysRunMode run_mode);//系统运行状态切换
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -103,15 +104,14 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_CAN_Init();
   MX_TIM1_Init();
+  MX_TIM8_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
   MX_TIM5_Init();
   MX_TIM6_Init();
-  MX_TIM8_Init();
-  //MX_USART3_UART_Init();
+  MX_CAN_Init();
   /* USER CODE BEGIN 2 */
 	PID_param_init();
 	OLED_Init();
@@ -120,7 +120,7 @@ int main(void)
 	Start_Timer();
 	HAL_CAN_Start(&hcan);
 	//__HAL_UART_ENABLE_IT(&huart3,UART_IT_RXNE);
-	State_Switch(S_Wait);//初始状态设为“wait”
+	RunMode_Switch(S_Wait);//初始状态设为“wait”
 
 	uint16_t curve_sum_receveied;
 	extern int capture_end_flag;
@@ -137,7 +137,7 @@ int main(void)
 			cacul_sin_params();
 		}
 		KeyState = Key_GetState();
-		switch (Sys_Para.manu)
+		switch (Sys_State.manu)
 		{
 			case id_setting:
 			key_process_idsetting(KeyState);
@@ -162,7 +162,7 @@ int main(void)
 			if (HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &CAN_Data.can_RxHeader, CAN_Data.RxData) == HAL_OK) //接收成功
 			{
 				uint16_t cmd_can; //指令类型
-				if (Sys_Para.manu == can_test)
+				if (Sys_State.manu == can_test)
 				{
 					OLED_ShowHexNum(1, 1, CAN_Data.can_RxHeader.StdId, 3);//打印id
 					//OLED_ShowNum(1, 9, CAN_Data.can_RxHeader.DLC , 1);//打印DLC
@@ -173,10 +173,10 @@ int main(void)
 					OLED_ShowHexNum(2, 9, RawData, 8);//打印原始data2*/
 				}
 				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				switch (CAN_Data.can_RxHeader.StdId)
+				uint8_t cmd_type = CAN_Data.can_RxHeader.StdId & 0x0000000F; //截取指令类型（1字节），不要id，因为id是变量
+				switch (cmd_type)
 				{
-				case 0x001: //广播的复位、启停
-				case (ID_ThisBoard << 4) | 0x001: //单播CMD
+				case 0x01: //复位、启停
 					memcpy(&cmd_can, &CAN_Data.RxData[0], 2);//cmd是数据段2字节
 					switch (cmd_can)
 					{
@@ -184,23 +184,22 @@ int main(void)
 						HAL_NVIC_SystemReset();
 						break;
 					case 0x001: //风机停止
-						State_Switch(S_Wait);
+						RunMode_Switch(S_Wait);
 						break;
 					case 0x002: //风机启动
-						State_Switch(S_NormRuning);
+						RunMode_Switch(S_NormRuning);
 						break;
 					default:
 						break;
 					}
 					break;
-				case 0x002: //广播的使能/失能、保存参数
-				case (ID_ThisBoard << 4) | 0x002: //使能、失能、保存参数、上传状态、转速
+				case 0x02: //使能/失能、保存参数
 					memcpy(&cmd_can, &CAN_Data.RxData[0], 2);//cmd是数据段2字节
 					switch (cmd_can)
 					{
 					case 0x003: //pid关闭
 					case 0x004: //pid启动
-						State_Switch(S_Wait);//停机
+						RunMode_Switch(S_Wait);//停机
 						Ctrl_Para.enable_pid[0] = cmd_can - 3;//pid总使能位赋值
 						break;
 					case 0x005: //失能跟踪曲线
@@ -208,15 +207,23 @@ int main(void)
 						TrackCurve_Para.enable_TrackCurve = cmd_can - 5;
 						if (TrackCurve_Para.enable_TrackCurve)
 						{
-							State_Switch(S_TrackingCurve);
+							RunMode_Switch(S_TrackingCurve);
 						}
 						else
 						{
-							State_Switch(S_Wait);
+							RunMode_Switch(S_Wait);
 						}
 						break;
 					case 0x007: //保存参数
-						//todo:数据保存置flash
+						if (Flash_SaveSysPara(&Sys_Para))
+						{
+							OLED_ShowString(4, 7, "S_OK");
+						}
+						else
+						{
+							MyCAN_Transmit_enum(TX_Err_SavePara);
+							OLED_ShowString(4, 7, "S_ER");
+						}
 						break;
 					case 0x008: //上传一次本机状态
 						MyCAN_Transmit_enum(TX_SYSPara);
@@ -230,14 +237,12 @@ int main(void)
 					}
 					break;
 				case 0x03: //广播目标转速首帧
-				case (ID_ThisBoard << 4) | 0x03: //本机目标转速首帧
 					for (int i = 0; i < 2; i++)
 					{
 						memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 4], 4);
 					}
 					break;
 				case 0x04: //广播目标转速尾帧
-				case (ID_ThisBoard << 4) | 0x04: //本机目标转速尾帧
 					for (int i = 0; i < 2; i++)
 					{
 						memcpy(&Ctrl_Para.rpm_want[i + 2], &CAN_Data.RxData[i * 4], 4);
@@ -247,7 +252,7 @@ int main(void)
 						OLED_ShowNum(2, 1 + i * 5, Ctrl_Para.rpm_want[i] * 10, 5);
 					}
 					break;
-				case (ID_ThisBoard << 4) | 0x0A: //跟踪曲线相位
+				case 0x0A: //跟踪曲线相位
 					for (int i = 0; i < 4; i++)
 					{
 						memcpy(&TrackCurve_Para.phase[i], &CAN_Data.RxData[i * 2], 2);
@@ -260,12 +265,13 @@ int main(void)
 			}
 			else //接收错误
 			{
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				HAL_Delay(500);
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				HAL_Delay(500);
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 				OLED_ShowString(4, 1, "f1err");
+				MyCAN_Transmit_enum(TX_Err_CAN);
+				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				HAL_Delay(500);
+				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				HAL_Delay(500);
+				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 			}
 			CAN_Para.PendingMsg--;
 		}
@@ -323,12 +329,17 @@ int main(void)
 						rxcount_pid += 1;
 						if (rxcount_pid == 1) //第一帧
 						{
+							RunMode_Switch(S_Wait);
+							for (int i = 0; i < 2; i++)
+							{
+								//memcpy(&Sys_Para.timer_pwm_ARR, &CAN_Data.RxData[0], 2); //pwm计数器ARR
+								memcpy(&Sys_Para.timer_ctrl_T, &CAN_Data.RxData[2], 2); //采样时间
+							}
+							SamplingTime_Modify(Sys_Para.timer_ctrl_T, 0);
 							for (int i = 0; i < 4; i++)
 							{
-								//暂时不分通道
 								memcpy(&pid_para[i].Kp, &CAN_Data.RxData[4], 4); //p
 							}
-							State_Switch(S_Wait);
 						}
 						else //第二帧
 						{
@@ -355,6 +366,7 @@ int main(void)
 			}
 			else //接收错误
 			{
+				MyCAN_Transmit_enum(TX_Err_CAN);
 				OLED_ShowString(4, 1, "f2err");
 				HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 				HAL_Delay(500);
@@ -415,30 +427,36 @@ void SystemClock_Config(void)
 //系统参数配置
 void Para_init(void)
 {
-	Sys_Para.ID_Thisboard = 0x00000003;
-	Sys_Para.Speed_MX_Fan = 16500;
-	Sys_Para.enable_send = false;
-	Sys_Para.enable_OLED = true;
-	Sys_Para.RunMode = S_Wait;
-	Sys_Para.manu = id_setting;
-	Sys_Para.timer_ctrl_T = 250;
-	Sys_Para.timer_fg_f = 12;//mhz
-	Sys_Para.timer_pwm_ARR = 4714;
+	if (!Flash_LoadSysPara(&Sys_Para))
+	{
+		Sys_State.RunMode = S_Wait;
+		Sys_State.manu = id_setting;
+		Sys_Para.ID_Thisboard = 0x00000003;
+		//Sys_Para.Speed_MX_Fan = 17500;
+		Sys_Para.enable_send = false;
+		Sys_Para.enable_OLED = true;
+		Sys_Para.enable_key = true;
+		Sys_Para.enable_pid = false;
+		Sys_Para.timer_ctrl_T = 200;
+		Sys_Para.timer_fg_f = 12;//mhz
+		//Sys_Para.timer_pwm_ARR = 4130;
+		MyCAN_Transmit_enum(TX_Err_SavePara);
+	}
 
 	/*控速相关变量*/
 	memset(&Ctrl_Para.enable_pid, 0, sizeof(Ctrl_Para.enable_pid));
+	Ctrl_Para.enable_pid[0] = Sys_Para.enable_pid;
 	memset(&Ctrl_Para.rpm_want, 0, sizeof(Ctrl_Para.rpm_want));
 
 	/*CAN相关变量*/
 	CAN_Para.PendingMsg = 0;
-	/*CAN_Data.TxID = ID_ThisBoard << 4;
 	/*跟踪曲线相关变量*//*系统相关变量*/
 }
 //状态切换
-void State_Switch(SM_SysState state_next)
+void RunMode_Switch(SM_SysRunMode run_mode)
 {
 	HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
-	switch (state_next)
+	switch (run_mode)
 	{
 	case S_Wait://停机等待，进行数据接收等
 		memset(Ctrl_Para.enable_fan, false, sizeof(Ctrl_Para.enable_fan));//失能
@@ -464,7 +482,7 @@ void State_Switch(SM_SysState state_next)
 	default:
 		break;
 	}
-	Sys_Para.RunMode = state_next;
+	Sys_State.RunMode = run_mode;
 }
 /*按键处理 —— 设定本机id*/
 void key_process_idsetting(uint8_t keystate)
@@ -474,7 +492,7 @@ void key_process_idsetting(uint8_t keystate)
 		OLED_Clear();
 		OLED_ShowString(1, 1, "MAX:");OLED_ShowString(1, 10, "| ID:");
 		OLED_ShowHexNum(1, 15, Sys_Para.ID_Thisboard, 2);
-		OLED_ShowNum(1, 5, Sys_Para.Speed_MX_Fan, 5);
+		OLED_ShowNum(1, 5, FANSPEED_MAX, 5);
 		OLED_ShowString(2, 5, "|    |");
 		OLED_ShowNum(2, 1, (uint32_t)(pid_para[3].Kp*1000),4);
 		OLED_ShowNum(2, 6, (uint32_t)(pid_para[3].Ki*1000),4);
@@ -515,7 +533,29 @@ void key_process_idsetting(uint8_t keystate)
 			break;
 		}
 		break;
-	case SW3_LONGLONG_PRESS: //保存到flash
+	case SW3_LONGLONG_PRESS: //重新配置can并保存到flash
+		uint8_t result_sw3 = 0;
+		result_sw3 = HAL_CAN_Stop(&hcan);
+		if (result_sw3 == HAL_OK)
+		{
+			filter_init();
+			HAL_CAN_Start(&hcan);
+		}
+		else
+		{
+			OLED_ShowNum(4, 7, result_sw3, 1);
+			break;
+		}
+		result_sw3 = (Flash_SaveSysPara(&Sys_Para));
+		if (result_sw3 == HAL_OK)
+		{
+			OLED_ShowString(4, 7, "S_OK");
+		}
+		else
+		{
+			OLED_ShowNum(4, 7, result_sw3, 1);
+			// OLED_ShowString(4, 7, "S_ER");
+		}
 		break;
 	default:
 		return;
@@ -535,7 +575,7 @@ void key_process_motortest(uint8_t keystate)
 	switch (keystate)
 	{
 	case SW2_SINGLE_CLICK://停机
-		State_Switch(S_Wait);
+		RunMode_Switch(S_Wait);
 		for (int i = 0; i < 4; i++)
 		{
 			Ctrl_Para.rpm_want[i] = 0;
@@ -546,10 +586,10 @@ void key_process_motortest(uint8_t keystate)
 	case SW2_LONG_PRESS: //开闭环切换
 		{
 			static bool mode_control = 0;
-			State_Switch(S_Wait); //停机
+			RunMode_Switch(S_Wait); //停机
 			Ctrl_Para.enable_pid[0] = mode_control; //pid总使能位赋值
 			mode_control = !mode_control;
-			State_Switch(S_Wait); //停机，并更新开闭环
+			RunMode_Switch(S_Wait); //停机，并更新开闭环
 			break;
 			HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		}
@@ -560,7 +600,7 @@ void key_process_motortest(uint8_t keystate)
 			Ctrl_Para.rpm_want[i] -= 1000;
 			OLED_ShowNum(2, 1 + i * 4, (uint32_t)Ctrl_Para.rpm_want[i], 4);
 		}
-		State_Switch(S_NormRuning);
+		RunMode_Switch(S_NormRuning);
 		HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 		break;
 	case SW3_LONG_PRESS:
@@ -569,7 +609,7 @@ void key_process_motortest(uint8_t keystate)
 			Ctrl_Para.rpm_want[i] += 1000;
 			OLED_ShowNum(2, 1 + i * 4, (uint32_t)Ctrl_Para.rpm_want[i], 4);
 		}
-		State_Switch(S_NormRuning);
+		RunMode_Switch(S_NormRuning);
 		HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 		break;
 	default:
@@ -597,17 +637,18 @@ void key_process_cantest(uint8_t keystate)
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW2_LONG_PRESS:
-		break;
-	case SW3_SINGLE_CLICK:
-		MyCAN_Transmit_enum(TX_Resend_Track);
+		MyCAN_Transmit_enum(TX_Err_RXTrackData);
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW3_LONG_PRESS:
+		MyCAN_Transmit_enum(TX_Heartbeat);
+		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	default:
 		break;
 	}
 }
+
 
 /* USER CODE END 4 */
 
