@@ -21,10 +21,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "gpio.h"
 
-#include "OLED.h"
-
 /* USER CODE BEGIN 0 */
-
+#include "OLED.h"
+extern bool oled_init;
 /* USER CODE END 0 */
 
 /*----------------------------------------------------------------------------*/
@@ -75,18 +74,18 @@ uint8_t Key_GetState(void)
 {
 	uint8_t Keystate = 0;
 	uint32_t PressDuration;
+	bool is_key_timeout = false;
 	if (HAL_GPIO_ReadPin(GPIOA, SW2_Pin) == 1)
 	{
 		HAL_Delay(15); //消抖
 		if (HAL_GPIO_ReadPin(GPIOA,SW2_Pin) == 1) //非扰动
 		{
-			bool key_timeout_count = false;
 			PressDuration = HAL_GetTick();
 			while (HAL_GPIO_ReadPin(GPIOA, SW2_Pin) == 1) //等待松手
 			{
-				if ((key_timeout_count == false) && ((HAL_GetTick() - PressDuration) >= 2200))
+				if ((is_key_timeout == false) && ((HAL_GetTick() - PressDuration) >= 2200))
 				{
-					key_timeout_count = true;
+					is_key_timeout = true;
 					OLED_ShowString(4, 7, "NEXT");
 				}
 				if ((HAL_GetTick() - PressDuration) >= 8000)
@@ -105,9 +104,9 @@ uint8_t Key_GetState(void)
 			}
 			else//超级长按,更改按键模式
 			{
-				State_Switch(S_Wait);
-				Sys_Para.manu = (enum Manu)(Sys_Para.manu + 1) % count;
-				oled_init = true;//允许重写屏幕背景
+				RunMode_Switch(S_Wait);
+				Sys_State.manu = (enum Manu)(Sys_State.manu + 1) % count;//更改按键菜单
+				oled_init = true;//请求重写屏幕背景
 				Keystate = SW2_LONGLONG_PRESS;
 			}
 		}
@@ -122,7 +121,15 @@ uint8_t Key_GetState(void)
 			{
 				if ((HAL_GetTick() - PressDuration) >= 6000)
 				{
-					break;
+					if ((is_key_timeout == false) && ((HAL_GetTick() - PressDuration) >= 2200))
+					{
+						is_key_timeout = true;
+						OLED_ShowString(4, 7, "LONG");
+					}
+					if ((HAL_GetTick() - PressDuration) >= 8000)
+					{
+						break;
+					}
 				}
 			}
 			PressDuration = HAL_GetTick() - PressDuration; //记录按下时长

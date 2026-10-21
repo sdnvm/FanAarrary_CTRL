@@ -53,7 +53,7 @@ void MX_TIM1_Init(void)
   htim1.Instance = TIM1;
   htim1.Init.Prescaler = 0;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 4125;
+  htim1.Init.Period = 4130-1;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -336,7 +336,7 @@ void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 7200-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 2500-1;
+  htim6.Init.Period = 2000-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -372,7 +372,7 @@ void MX_TIM8_Init(void)
   htim8.Instance = TIM8;
   htim8.Init.Prescaler = 0;
   htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim8.Init.Period = 3125;
+  htim8.Init.Period = 4130-1;
   htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim8.Init.RepetitionCounter = 0;
   htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -463,7 +463,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     __HAL_AFIO_REMAP_TIM2_PARTIAL_2();
 
     /* TIM2 interrupt Init */
-    HAL_NVIC_SetPriority(TIM2_IRQn, 2, 0);
+    HAL_NVIC_SetPriority(TIM2_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM2_IRQn);
   /* USER CODE BEGIN TIM2_MspInit 1 */
 
@@ -487,7 +487,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     HAL_GPIO_Init(FG3_GPIO_Port, &GPIO_InitStruct);
 
     /* TIM3 interrupt Init */
-    HAL_NVIC_SetPriority(TIM3_IRQn, 2, 0);
+    HAL_NVIC_SetPriority(TIM3_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM3_IRQn);
   /* USER CODE BEGIN TIM3_MspInit 1 */
 
@@ -511,7 +511,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     HAL_GPIO_Init(FG1_GPIO_Port, &GPIO_InitStruct);
 
     /* TIM4 interrupt Init */
-    HAL_NVIC_SetPriority(TIM4_IRQn, 2, 0);
+    HAL_NVIC_SetPriority(TIM4_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM4_IRQn);
   /* USER CODE BEGIN TIM4_MspInit 1 */
 
@@ -535,7 +535,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
     HAL_GPIO_Init(FG4_GPIO_Port, &GPIO_InitStruct);
 
     /* TIM5 interrupt Init */
-    HAL_NVIC_SetPriority(TIM5_IRQn, 2, 0);
+    HAL_NVIC_SetPriority(TIM5_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM5_IRQn);
   /* USER CODE BEGIN TIM5_MspInit 1 */
 
@@ -591,8 +591,8 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
 		HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_2);	//开启pwm1
 		HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);	//开启pwm2
 		HAL_TIM_Base_Start(&htim1);
-		set_rpm(0, START_RPM);
-		set_rpm(1, START_RPM);
+		set_rpm(0, 0);
+		set_rpm(1, 0);
   /* USER CODE END TIM1_MspPostInit 1 */
   }
   else if(timHandle->Instance==TIM8)
@@ -615,8 +615,8 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
 		HAL_TIM_PWM_Start(&htim8,TIM_CHANNEL_3);	//开启pwm3
 		HAL_TIM_PWM_Start(&htim8,TIM_CHANNEL_1);	//开启pwm4
 		HAL_TIM_Base_Start(&htim8);
-		set_rpm(2,START_RPM);
-		set_rpm(3,START_RPM);
+		set_rpm(2,0);
+		set_rpm(3,0);
   /* USER CODE END TIM8_MspPostInit 1 */
   }
 
@@ -740,35 +740,46 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 }
 
 /* USER CODE BEGIN 1 */
+/*采样时间更改
+ * SamplingTime_ms:闭环采样时间ms
+ * pwm_arr: pwm计数器ARR值
+ */
 void SamplingTime_Modify(const uint16_t SamplingTime_ms, const uint16_t pwm_arr)
 {
-	uint16_t arr_value_s = (SamplingTime_ms * 10) - 1;
-	__HAL_TIM_DISABLE_IT(&htim6, TIM_IT_UPDATE);
-	__HAL_TIM_SET_AUTORELOAD(&htim6, arr_value_s);
-	__HAL_TIM_SET_COUNTER(&htim6, 0);
-	Sys_Para.timer_ctrl_T = SamplingTime_ms;
-	
-	Sys_Para.timer_pwm_ARR = pwm_arr;
-	__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_2, 0);//pwm1
-	__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1, 0);//pwm2
-  __HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_3, 0);//pwm3
-	__HAL_TIM_SET_COMPARE(&htim8,TIM_CHANNEL_1, 0);//pwm4
-	__HAL_TIM_SET_AUTORELOAD(&htim1, pwm_arr);
-	__HAL_TIM_SET_AUTORELOAD(&htim8, pwm_arr);
-	
-	OLED_ShowNum(4, 12, SamplingTime_ms, 3);
-	OLED_ShowNum(1, 13, Sys_Para.timer_pwm_ARR, 4);
-	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-	__HAL_TIM_ENABLE_IT(&htim6, TIM_IT_UPDATE);
+  if (SamplingTime_ms != 0)
+  {
+    __HAL_TIM_DISABLE_IT(&htim6, TIM_IT_UPDATE);
+    uint16_t arr_value_s = (SamplingTime_ms * 10) - 1;
+    Sys_Para.timer_ctrl_T = SamplingTime_ms;
+    __HAL_TIM_SET_AUTORELOAD(&htim6, arr_value_s);
+    __HAL_TIM_SET_COUNTER(&htim6, 0);
+    __HAL_TIM_ENABLE_IT(&htim6, TIM_IT_UPDATE);
+  }
+	/*if (pwm_arr != 0)
+	{
+    Sys_Para.timer_pwm_ARR = pwm_arr;
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0); //pwm1
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0); //pwm2
+    __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, 0); //pwm3
+    __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0); //pwm4
+    __HAL_TIM_SET_AUTORELOAD(&htim1, pwm_arr);
+    __HAL_TIM_SET_AUTORELOAD(&htim8, pwm_arr);
+	}*/
+	if (Sys_State.manu == para_setting)
+	{
+	  OLED_ShowNum(4, 12, Sys_Para.timer_ctrl_T, 3);
+  	//OLED_ShowNum(4, 1, PWM_ARR, 4);
+	}
+	HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 }
 void set_rpm(const uint8_t temp_cc, const float rpm)
 {
-  uint32_t comp = (uint32_t)((((double)Sys_Para.timer_pwm_ARR * (double)rpm ) / (double)Sys_Para.Speed_MX_Fan) + 0.5);
-	comp = (comp > Sys_Para.timer_pwm_ARR) ? Sys_Para.timer_pwm_ARR : comp;  //限幅
+  uint32_t comp = (uint32_t)(rpm * RPM_TO_ARR + 0.5);
+	comp = (comp > PWM_ARR) ? PWM_ARR : comp;  //限幅
 	switch(temp_cc){
 			case 0:{
 				__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_2, (uint16_t)comp);//pwm1
-			  OLED_ShowNum(1, 13, (uint16_t)comp, 4);//显示算得的比较值
+			  //OLED_ShowNum(4, 13, (uint16_t)comp, 4);//显示算得的比较值
 			}break;
 			case 1:{
 				__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_1, (uint16_t)comp);//pwm2
