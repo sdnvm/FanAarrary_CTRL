@@ -309,7 +309,7 @@ void TIM6_IRQHandler(void)
 			OLED_ShowNum(1,1 + chanel * 4, OverFlow[chanel],3);
 			//OLED_ShowNum(1,5, IC_now[chanel],5);
 		}
-		
+
 		/*闭环控制*/
 		pid_control(chanel, CCR_NUM);
 
