@@ -14,12 +14,13 @@ typedef struct
 	float Kp, Ki, Kd;
 } PidPara;
 
-extern PidPara pid_para[4];
+
+extern __IO PidPara pid_para[4];
 
 extern void PID_param_init(void);
 extern void set_pid_target(uint8_t c, float temp_target_rpm);
-extern void set_p_i_d(uint8_t c, float p, float i, float d);
-extern float PID_realize(PidPara *pid);
+extern void set_p_i_d(float p, float i, float d);
+extern float PID_realize(__IO PidPara *pid);
 
 // extern float get_pid_actual(PidPara *pid);
 // extern void time_period_fun(void);

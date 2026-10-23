@@ -3,28 +3,26 @@
 
 #include "stm32f1xx.h"
 #include <math.h>
+#include "main.h"
 
 // ??????????
-typedef struct {
-    float mid;        // ???
-    int period;     // ??(?)
-    float amplitude;  // ??
-		uint16_t ctrl_num;
-		uint16_t sampl_num;
+typedef struct
+{
+	float mid; // 中值（）
+	int period; // 周期(单位:ms)
+	float amplitude; //幅值
+	uint16_t ctrl_num;
+	uint16_t sampl_num;
 } SinParams;
 
-#define MAX_SIN_POINTS 64  // ???????(??????100?)
 #define M_PAI 3.141593f
 #define STEP 0.5f
 #define SIN_SAMPLE_NUM 2
 
-
 // ??????
-
-extern float sin_control_values[MAX_SIN_POINTS]; // ??????????
 extern uint8_t sin_point_index; // ?????????
 extern SinParams Sin_Para1;
 // ????
-void cacul_sin_params(void);
-
+void cacul_sin_params();
+void TrackCurve();
 #endif

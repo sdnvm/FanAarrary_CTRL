@@ -21,6 +21,7 @@
 #include "can.h"
 
 /* USER CODE BEGIN 0 */
+#include "OLED.h"
 CAN_TxHeaderTypeDef can_TxHeader;	//发信数据头
 uint32_t TxMailbox;					//发信邮箱
 /* USER CODE END 0 */
@@ -152,7 +153,13 @@ void filter_init(void)
 	filter1.FilterMaskIdHigh = 0x008 << 5; //尾帧
 	filter1.FilterMaskIdLow = (0x009 << 5); //set pid参数
 	HAL_CAN_ConfigFilter(&hcan, &filter1);
-	/*/*16位屏蔽-FIFO0===指定风机帧#1#
+	filter1.FilterBank = 4;
+	filter1.FilterIdHigh = (Sys_Para.ID_Thisboard << 9 | 0x006 << 5); //首帧
+	filter1.FilterIdLow = (Sys_Para.ID_Thisboard << 9 | 0x007 << 5); //续帧
+	filter1.FilterMaskIdHigh = (Sys_Para.ID_Thisboard << 9 | 0x008 << 5); //尾帧
+	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x009 << 5); //set pid参数
+	HAL_CAN_ConfigFilter(&hcan, &filter1);
+	/*16位屏蔽-FIFO0===指定风机帧#1#
 	filter1.FilterBank = 4;
 	filter1.FilterFIFOAssignment = CAN_FilterFIFO0;//改为fifo0
 	filter1.FilterMode = CAN_FILTERMODE_IDMASK;//改为屏蔽模式
@@ -192,7 +199,7 @@ void MyCAN_Transmit(uint32_t ID, uint8_t* Data, uint32_t Length)
 /*上传转速数据
  * c2 == 0|2时id为0E，1|3时，id为0F
  */
-void MyCAN_Transmit_RPM(float* rpm_r, float* rpm_c, const uint8_t c2)
+void MyCAN_Transmit_RPM(float rpm_r, const float rpm_c, const uint8_t c2)
 {
 	if (Sys_Para.enable_send == 1)
 	{
@@ -206,14 +213,14 @@ void MyCAN_Transmit_RPM(float* rpm_r, float* rpm_c, const uint8_t c2)
 		else
 		{
 			txid |= 0x0F; //上传B转速数据
-			memcpy(&txdata[0], rpm_r, 4);//实际值
-			memcpy(&txdata[4], rpm_c, 4);//控制值
+			memcpy(&txdata[0], &rpm_r, 4);//实际值
+			memcpy(&txdata[4], &rpm_c, 4);//控制值
 			MyCAN_Transmit(txid, txdata, 8);
 		}
 	}
 }
 /*按类型直接上传数据*/
-void MyCAN_Transmit_enum(TXType TX_Tpye)
+void MyCAN_Transmit_enum(const TXType TX_Tpye)
 {
 	uint8_t upload_type = 0;
 	switch (TX_Tpye)
@@ -222,23 +229,27 @@ void MyCAN_Transmit_enum(TXType TX_Tpye)
 		//todo：上传本机当前状态
 		break;
 	case TX_Heartbeat://上传心跳包
+		//todo:心跳包
+		break;
 	case TX_ERR:
 	case TX_Err_CAN:
 	case TX_Err_RXTrackData://请求重发跟踪曲线数据
 	case TX_Err_SavePara:
 		upload_type = TX_Tpye;
 		MyCAN_Transmit(0x07FD, &upload_type, 1);
+		OLED_ShowString(4, 1, "err");
+		OLED_ShowNum(4, 4, upload_type, 2);
 		break;
 	default:
 		break;
 	}
 }
 /*fifo0收信中断回调*/
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan1)
 {
 	CAN_RxHeaderTypeDef rxHeader;
 	uint8_t rxData[8];
-	HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData);
+	HAL_CAN_GetRxMessage(hcan1, CAN_RX_FIFO0, &rxHeader, rxData);
 
 	if (rxHeader.StdId == 0x001 && rxHeader.RTR == CAN_RTR_REMOTE)
 	{
@@ -247,11 +258,11 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
 }
 
 /*fifo1收信中断回调*/
-void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef* hcan)
+void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef* hcan2)
 {
 	CAN_RxHeaderTypeDef rxHeader;
 	uint8_t rxData[8];
-	HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &rxHeader, rxData);
+	HAL_CAN_GetRxMessage(hcan2, CAN_RX_FIFO1, &rxHeader, rxData);
 
 	switch (rxHeader.StdId)
 	{

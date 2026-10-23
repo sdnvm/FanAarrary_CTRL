@@ -53,7 +53,7 @@ void MX_CAN_Init(void);
 /* USER CODE BEGIN Prototypes */
 void filter_init(void);
 void MyCAN_Transmit(uint32_t ID, uint8_t *Data, uint32_t Length);
-void MyCAN_Transmit_RPM(float* rpm_r, float* rpm_c, uint8_t c2);
+void MyCAN_Transmit_RPM(float rpm_r, float rpm_c, uint8_t c2);
 void MyCAN_Transmit_enum(TXType TX_Tpye);
 /* USER CODE END Prototypes */
 

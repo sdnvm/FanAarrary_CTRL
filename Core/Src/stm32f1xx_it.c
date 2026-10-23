@@ -23,8 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "control.h"
-#include "tim.h"
-#include "bsp_pid.h"
+//#include "tim.h"
+//#include "bsp_pid.h"
 #include "OLED.h"
 #include "sin_control.h"
 /* USER CODE END Includes */
@@ -36,7 +36,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+//#define all_fg_flags TIM_FLAG_UPDATE | TIM_FLAG_CC1 | TIM_FLAG_CC2 | TIM_FLAG_CC3 | TIM_FLAG_CC4
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -58,17 +58,19 @@ __IO uint16_t IC_last[4] = {0, 0, 0, 0};//上一次捕获值
 /*处理fg信号*/
 void fg_process(const uint8_t j, const TIM_HandleTypeDef* htimj)
 {
+	const uint32_t flags_fg = htimj->Instance->SR;//快照
 	//溢出中断
-	if (__HAL_TIM_GET_FLAG(htimj, TIM_FLAG_UPDATE))
+	if ((flags_fg & TIM_FLAG_UPDATE) != 0U)
 	{
 		OverFlow_next[j] += 1;
 		__HAL_TIM_CLEAR_FLAG(htimj, TIM_FLAG_UPDATE);
 	}
-	//输入捕获中断
-	if (__HAL_TIM_GET_FLAG(htimj, TIM_FLAG_CC3))
+	//有效的输入捕获中断
+	const uint32_t valid_CCR_flag =	(j == 3U) ? TIM_FLAG_CC4 : TIM_FLAG_CC3;
+	if ((flags_fg & valid_CCR_flag) != 0U)
 	{
 		IC_last[j] = IC_now[j];
-		if (j == 3)
+		if (j == 3U)
 		{
 			IC_now[j] = htimj->Instance->CCR4;
 		}
@@ -77,9 +79,7 @@ void fg_process(const uint8_t j, const TIM_HandleTypeDef* htimj)
 			IC_now[j] = htimj->Instance->CCR3;
 		}
 		OverFlow[j] = OverFlow_next[j];
-		OverFlow_next[j] = 0;
-		__HAL_TIM_CLEAR_FLAG(htimj, TIM_FLAG_UPDATE);
-		__HAL_TIM_CLEAR_FLAG(htimj, TIM_FLAG_CC3);
+		OverFlow_next[j] = 0U;
 	}
 }
 /* USER CODE END PFP */
@@ -259,7 +259,7 @@ void TIM3_IRQHandler(void)
 	fg_process(2, &htim3);
   /* USER CODE END TIM3_IRQn 0 */
   /* USER CODE BEGIN TIM3_IRQn 1 */
-
+	//HAL_TIM_IRQHandler(&htim3);
   /* USER CODE END TIM3_IRQn 1 */
 }
 
@@ -313,33 +313,9 @@ void TIM6_IRQHandler(void)
 		/*闭环控制*/
 		pid_control(chanel, CCR_NUM);
 
-		/*跟踪曲线
-		 * sin判断的代码在-can里??
-		 */
-		static uint16_t ctrl_tim = 0;//决定采样时间
-		ctrl_tim++;
-		if (Sys_State.RunMode == S_TrackingCurve && ctrl_tim >= Sin_Para1.ctrl_num)
-		{
-			if (sin_point_index == Sin_Para1.sampl_num)
-			{
-				sin_point_index = 0; // 重置索引，为下一个正弦波做准备
-			}
-			/*if (c == 1) {
-			pid_para[0].target_rpm = sin_control_values[sin_point_index];
-			} else if (c == 2) {*/
-			if (Ctrl_Para.enable_pid[0])
-			{
-				set_rpm(0, sin_control_values[sin_point_index]);
-				pid_para[0].target_rpm = sin_control_values[sin_point_index];
-			}
-			else
-			{
-				set_rpm(0, sin_control_values[sin_point_index]);
-			}
-			// }
-			sin_point_index++; // 移动到下一个点
-			ctrl_tim = 0; // 重置溢出计数器
-		}
+		/*跟踪曲线*/
+		TrackCurve();
+
 		chanel += 1;
 		//清中断标志位
 		__HAL_TIM_CLEAR_FLAG(&htim6, TIM_FLAG_UPDATE);

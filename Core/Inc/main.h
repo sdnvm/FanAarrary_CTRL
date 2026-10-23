@@ -57,8 +57,8 @@ enum Manu
  */
 typedef struct
 {
-	enum Manu manu;				//菜单枚举。id设定、风机测试、can测试、参数设定
-	SM_SysRunMode RunMode;		//状态枚举。跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
+	__IO enum Manu manu;				//菜单枚举。id设定、风机测试、can测试、参数设定
+	__IO SM_SysRunMode RunMode;		//状态枚举。跟踪曲线、开闭环、准备接收长数据、快速单通道采样、
 }SysState;
 /*系统基本参数
  * 保存到flash
@@ -79,14 +79,18 @@ typedef struct
 typedef struct 
 {
 	float rpm_want[4];			//目标转速
-	bool enable_fan[5];			//风机开关状态，[0]为总开关,后几个为具体开关
-	bool enable_pid[5];			//pid开关状态，[0]为开关，后几个由程序控制，别直接写1
+	__IO bool enable_fan[5];			//风机开关状态，[0]为总开关,后几个为具体开关
+	__IO bool enable_pid[5];			//pid开关状态，[0]为开关，后几个由程序控制，别直接写1
 }CtrlPara;
+typedef struct
+{
+	float Kp, Ki, Kd;
+} PidPara_base;
 /*can相关参数*/
 typedef struct 
 {
 	uint8_t PendingMsg;			//待解析数据量
-	bool is_Can_TXSec;			//正在发送？
+	__IO bool is_Can_TXSec;			//正在发送？
 }CANPara;
 /*一个can数据包*/
 typedef struct 
@@ -110,8 +114,8 @@ typedef struct
 	bool start_cacul;			//开始计算
 	//bool is_received[CURVE_SAMPLE_MX];//成功收到数据？
 }TrackCurvePara;
-#define CURVE_SAMPLE_MX 256			//拟合曲线缓冲区大小
 /*跟踪曲线数据*/
+#define CURVE_SAMPLE_MX 256			//拟合曲线缓冲区大小
 typedef struct
 {
 	uint16_t curve_data[CURVE_SAMPLE_MX]; //跟踪曲线数据缓冲区
@@ -120,6 +124,7 @@ typedef struct
 	uint16_t length;			//帧个数
 	uint16_t ctrl_num;			//乘ctrl_time=sin_ctrl_time
 }TrackCurveData;
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -178,6 +183,7 @@ void Error_Handler(void);
 #define SW3_LONGLONG_PRESS 33
 
 /*！！要手动改的宏！！*/
+
 #define SELECTER_IO_FAN 2				//1是inlet，2是outlet
 #if (SELECTER_IO_FAN == 1)
 #define FANSPEED_MAX 20000		//输入端风扇最大转速
@@ -186,7 +192,7 @@ void Error_Handler(void);
 #endif
 
 #define PWM_ARR 4130					//pwm寄存器溢出值
-#define RPM_TO_ARR (double)PWM_ARR/FANSPEED_MAX	//转速转arr值
+#define RPM_TO_ARR ((double)PWM_ARR/FANSPEED_MAX)	//转速转arr值
 
 //#define KTS (60.0f*DC_POWER/12)
 //#define KCCR (30*72000000)/2/8/10
@@ -198,6 +204,8 @@ extern CtrlPara Ctrl_Para;
 extern CANPara CAN_Para;
 extern CANData CAN_Data;
 extern TrackCurvePara TrackCurve_Para;
+extern TrackCurveData* TrackCurve_Data_p;
+extern PidPara_base pid_para_base;//pid基础参数
 //extern struct SYS_PARA Sys_Para;
 //extern struct CTRL_PARA Ctrl_Para;
 //extern struct CAN_PARA Can_Para;

@@ -22,7 +22,6 @@
 
 /* USER CODE BEGIN 0 */
 extern void OLED_ShowNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Length);
-void set_rpm(uint8_t temp_cc, float rpm);
 
 /* USER CODE END 0 */
 
@@ -799,19 +798,20 @@ void Start_Timer(void)
 	/*开pwm*/
 	//放在HAL_TIM_MspPostInit里
 	/*开fg*/
-	__HAL_TIM_CLEAR_FLAG(&htim4,TIM_FLAG_UPDATE);
-	__HAL_TIM_CLEAR_FLAG(&htim2,TIM_FLAG_UPDATE);
-	__HAL_TIM_CLEAR_FLAG(&htim3,TIM_FLAG_UPDATE);
-	__HAL_TIM_CLEAR_FLAG(&htim5,TIM_FLAG_UPDATE);
-	HAL_TIM_Base_Start_IT(&htim4);						//fg1
-	HAL_TIM_Base_Start_IT(&htim2);						//fg2
-	HAL_TIM_Base_Start_IT(&htim3);						//fg3
-	HAL_TIM_Base_Start_IT(&htim5);						//fg4
-	HAL_TIM_IC_Start_IT(&htim4,TIM_CHANNEL_3);
-	HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_3);
-	HAL_TIM_IC_Start_IT(&htim3,TIM_CHANNEL_3);
-	HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_4);
+  __HAL_TIM_CLEAR_FLAG(&htim4, TIM_FLAG_UPDATE | TIM_FLAG_CC1 | TIM_FLAG_CC2 | TIM_FLAG_CC3 | TIM_FLAG_CC4);
+  __HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE | TIM_FLAG_CC1 | TIM_FLAG_CC2 | TIM_FLAG_CC3 | TIM_FLAG_CC4);
+  __HAL_TIM_CLEAR_FLAG(&htim3, TIM_FLAG_UPDATE | TIM_FLAG_CC1 | TIM_FLAG_CC2 | TIM_FLAG_CC3 | TIM_FLAG_CC4);
+  __HAL_TIM_CLEAR_FLAG(&htim5, TIM_FLAG_UPDATE | TIM_FLAG_CC1 | TIM_FLAG_CC2 | TIM_FLAG_CC3 | TIM_FLAG_CC4);
+   HAL_TIM_Base_Start_IT(&htim4); //fg1
+   HAL_TIM_Base_Start_IT(&htim2); //fg2
+   HAL_TIM_Base_Start_IT(&htim3); //fg3
+   HAL_TIM_Base_Start_IT(&htim5); //fg4
+   HAL_TIM_IC_Start_IT(&htim4,TIM_CHANNEL_3);
+   HAL_TIM_IC_Start_IT(&htim2,TIM_CHANNEL_3);
+   HAL_TIM_IC_Start_IT(&htim3,TIM_CHANNEL_3);
+	 HAL_TIM_IC_Start_IT(&htim5,TIM_CHANNEL_4);
 	/*开流控timer*/
+  __HAL_TIM_CLEAR_FLAG(&htim6, TIM_FLAG_UPDATE);
 	HAL_TIM_Base_Start_IT(&htim6);
 }
 

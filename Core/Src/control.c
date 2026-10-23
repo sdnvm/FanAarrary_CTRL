@@ -2,12 +2,11 @@
 #include "bsp_pid.h"
 #include <math.h>
 #include <stdlib.h>
-
 #include "can.h"
 #include "OLED.h"
 
 /* 私有变量 */
-__IO float cont_rpm[4] = {0.0f, 0.0f, 0.0f, 0.0f};    // 通道0-3计算得的控制值 rpm
+static float cont_rpm[4] = {0.0f, 0.0f, 0.0f, 0.0f};    // 通道0-3计算得的控制值 rpm
 /* 局部函数 */
 extern void set_rpm(uint8_t temp_cc, float rpm);
 
@@ -15,11 +14,12 @@ extern void set_rpm(uint8_t temp_cc, float rpm);
 void pid_control(const uint8_t c, const uint32_t CCR_num)
 {
 	pid_para[c].actual_rpm = (float)(3.6e8 / (double)CCR_num); //计算实际转速 RPM
+	if ((uint32_t)pid_para[c].actual_rpm == 65535)pid_para[c].actual_rpm = 0.0f; //溢出处理
 	pid_para[c].err = pid_para[c].target_rpm - pid_para[c].actual_rpm;//计算偏差
 	/*PID计算*/
 	if (Ctrl_Para.enable_fan[c + 1] && Ctrl_Para.enable_pid[0])
 	{
-		cont_rpm[c] += PID_realize(&pid_para[c]);
+		cont_rpm[c] += PID_realize(&pid_para[c]); //增量式pid计算
 		cont_rpm[c] = ((cont_rpm[c] > FANSPEED_MAX) ? FANSPEED_MAX : cont_rpm[c]); // 上限处理
 		cont_rpm[c] = ((cont_rpm[c] < 0) ? 0 : cont_rpm[c]); // 下限处理
 		set_rpm(c, cont_rpm[c]);
@@ -33,12 +33,12 @@ void pid_control(const uint8_t c, const uint32_t CCR_num)
 			Ctrl_Para.enable_pid[c + 1] = 1;
 		}
 	}
-	MyCAN_Transmit_RPM(&pid_para[c].actual_rpm, &cont_rpm[c], c);
+	MyCAN_Transmit_RPM(pid_para[c].actual_rpm, cont_rpm[c], c);
 	OLED_ShowNum(3, 1 + c * 4, (uint16_t)pid_para[c].actual_rpm, 4);
 }
 
 /*目标值改变时PID初始化*/
-void pid_reset(uint8_t c, const float target_t)
+void pid_reset(const uint8_t c, const float target_t)
 {
 	Ctrl_Para.enable_pid[c+1] = 0;//复位子开关
 	cont_rpm[c] = target_t;//强制传入实际值

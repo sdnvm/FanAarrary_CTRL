@@ -1,15 +1,5 @@
 #include "save_flash.h"
 #include <string.h>
-
-typedef struct
-{
-	uint32_t magic;//魔术字：用于判断该页是否保存过有效参数（0xFFFFFFFF 表示空页）
-	uint32_t version;//版本号：结构体定义变化时修改此值，旧数据会自动失效
-	uint32_t data_size;//数据大小
-	SysPara data;//系统参数副本
-	uint32_t checksum;//校验和
-} SysParaFlashRecord;
-
 /*计算检验和*/
 static uint32_t SysPara_Checksum(const uint8_t *data, uint32_t size)
 {
@@ -22,7 +12,7 @@ static uint32_t SysPara_Checksum(const uint8_t *data, uint32_t size)
 }
 
 /*保存参数*/
-HAL_StatusTypeDef Flash_SaveSysPara(const SysPara *sys_para)
+HAL_StatusTypeDef Flash_SaveSysPara(const SysPara *sys_para, const PidPara_base *pid_para_base)
 {
 	Sys_Para.enable_pid = Ctrl_Para.enable_pid[0];//保存总开关状态
 	SysParaFlashRecord record = {0};
@@ -30,7 +20,7 @@ HAL_StatusTypeDef Flash_SaveSysPara(const SysPara *sys_para)
 	uint32_t page_error = 0;
 	HAL_StatusTypeDef status;
 
-	if (sys_para == NULL)
+	if ((sys_para == NULL ) || (pid_para_base == NULL))
 	{
 		return HAL_ERROR;
 	}
@@ -38,7 +28,8 @@ HAL_StatusTypeDef Flash_SaveSysPara(const SysPara *sys_para)
 	record.magic = SYS_PARA_FLASH_MAGIC;
 	record.version = SYS_PARA_FLASH_VERSION;
 	record.data_size = sizeof(SysPara);
-	memcpy(&record.data, sys_para, sizeof(SysPara));
+	memcpy(&record.data.sys_para_t, sys_para, sizeof(SysPara));
+	memcpy(&record.data.pid_para_base_t, pid_para_base, sizeof(PidPara_base));
 	record.checksum = SysPara_Checksum((const uint8_t *)&record.data, sizeof(record.data));
 	//解锁flash
 	status = HAL_FLASH_Unlock();
@@ -82,7 +73,7 @@ HAL_StatusTypeDef Flash_SaveSysPara(const SysPara *sys_para)
 }
 
 /*读取参数*/
-bool Flash_LoadSysPara(SysPara *sys_para)
+bool Flash_LoadSysPara(SysPara *sys_para, PidPara_base *pid_para_base)
 {
 	const SysParaFlashRecord *record = (const SysParaFlashRecord *)SYS_PARA_FLASH_ADDRESS;
 
@@ -95,6 +86,7 @@ bool Flash_LoadSysPara(SysPara *sys_para)
 		return false;
 	}
 
-	memcpy(sys_para, &record->data, sizeof(SysPara));
+	memcpy(sys_para, &record->data.sys_para_t, sizeof(SysPara));
+	memcpy(pid_para_base, &record->data.pid_para_base_t, sizeof(PidPara_base));
 	return true;
 }
