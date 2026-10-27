@@ -197,26 +197,29 @@ void MyCAN_Transmit(uint32_t ID, uint8_t* Data, uint32_t Length)
 	}
 }
 /*上传转速数据
- * c2 == 0|2时id为0E，1|3时，id为0F
+ *a风机的实际值+目标值 & b风机的实际值+目标值;
+ * c2 == 0时id为0E，3时，id为0F
  */
-void MyCAN_Transmit_RPM(float rpm_r, const float rpm_c, const uint8_t c2)
+void MyCAN_Transmit_RPM(const uint16_t rpm_real1, const uint16_t rpm_ctrl1, const uint16_t rpm_real2, const uint16_t rpm_ctrl2, const uint8_t c2)
 {
 	if (Sys_Para.enable_send == 1)
 	{
 		uint32_t txid = 0x00000000; //id
 		uint8_t txdata[8]; //data(一帧)
 		txid |= ((Sys_Para.ID_Thisboard & 0x7F) << 4);
-		if (c2 == 0 || c2 == 2)
+		if (c2 == 1)
 		{
-			txid |= 0x0E & 0x0F; //上传A转速数据
+			txid |= 0x0E; //上传A转速数据
 		}
 		else
 		{
 			txid |= 0x0F; //上传B转速数据
-			memcpy(&txdata[0], &rpm_r, 4);//实际值
-			memcpy(&txdata[4], &rpm_c, 4);//控制值
-			MyCAN_Transmit(txid, txdata, 8);
 		}
+		memcpy(&txdata[0], &rpm_real1, 2); //实际值
+		memcpy(&txdata[2], &rpm_ctrl1, 2); //控制值
+		memcpy(&txdata[4], &rpm_real2, 2); //实际值
+		memcpy(&txdata[6], &rpm_ctrl2, 2); //控制值
+		MyCAN_Transmit(txid, txdata, 8);
 	}
 }
 /*按类型直接上传数据*/

@@ -136,23 +136,26 @@ int main(void)
 		{
 			cacul_sin_params();
 		}
-		KeyState = Key_GetState();
-		switch (Sys_State.manu)
+		if (Sys_Para.enable_key)
 		{
-		case id_setting:
-			key_process_idsetting(KeyState);
-			break;
-		case fan_test:
-			key_process_motortest(KeyState);
-			break;
-		case can_test:
-			key_process_cantest(KeyState);
-			break;
-		case para_setting:
-			//todo:参数设定
-			break;
-		default:
-			break;
+			KeyState = Key_GetState();
+			switch (Sys_State.manu)
+			{
+			case id_setting:
+				key_process_idsetting(KeyState);
+				break;
+			case fan_test:
+				key_process_motortest(KeyState);
+				break;
+			case can_test:
+				key_process_cantest(KeyState);
+				break;
+			case para_setting:
+				//todo:参数设定
+				break;
+			default:
+				break;
+			}
 		}
 
 		/* FIFO0扫描接收 */
@@ -229,11 +232,15 @@ int main(void)
 						break;
 					case 0x008: //上传一次本机状态
 						MyCAN_Transmit_enum(TX_SYSPara);
+						break;
 					case 0x009: //使能上传转速
 						Sys_Para.enable_send = !Sys_Para.enable_send;
+						break;
 					case 0x00A://使能oled显示
 						Sys_Para.enable_OLED = !Sys_Para.enable_OLED;
 						break;
+					case 0x00B:
+						Sys_Para.enable_key = !Sys_Para.enable_key;
 					default:
 						break;
 					}
@@ -635,8 +642,8 @@ void key_process_cantest(uint8_t keystate)
 	switch (keystate)
 	{
 	case SW2_SINGLE_CLICK:
-		MyCAN_Transmit_RPM(temp_cantx, temp_cantx2, 1);
-		MyCAN_Transmit_RPM(temp_cantx, temp_cantx2, 2);
+		MyCAN_Transmit_RPM(temp_cantx, temp_cantx2, 1231,1200, 1);
+		MyCAN_Transmit_RPM(3000, 4000, 5000,6000, 3);
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 		break;
 	case SW2_LONG_PRESS:
