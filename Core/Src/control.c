@@ -33,12 +33,12 @@ void pid_control(const uint8_t c, const uint32_t CCR_num)
 			Ctrl_Para.enable_pid[c + 1] = 1;
 		}
 	}
-	if ((c == 1) || (c == 3))
+	if ((c == 1))
 	{
 		MyCAN_Transmit_RPM((uint16_t)pid_para[c-1].actual_rpm, (uint16_t)cont_rpm[c-1],
 						   (uint16_t)pid_para[c].actual_rpm, (uint16_t)cont_rpm[c], c);
+		OLED_ShowNum(3, 1 + c * 4, (uint16_t)pid_para[c].actual_rpm, 4);
 	}
-	OLED_ShowNum(3, 1 + c * 4, (uint16_t)pid_para[c].actual_rpm, 4);
 }
 
 /*目标值改变时PID初始化*/
