@@ -115,12 +115,12 @@ int main(void)
   MX_TIM6_Init();
   MX_CAN_Init();
   /* USER CODE BEGIN 2 */
-	PID_param_init();
+	PID_param_init();//初始化pid参数
 	OLED_Init();
 	OLED_Clear();
-	Para_init();
+	Para_init();//初始化系统参数
 	Start_Timer();
-	HAL_CAN_Start(&hcan);
+	HAL_CAN_Start(&hcan);//使能can
 	//__HAL_UART_ENABLE_IT(&huart3,UART_IT_RXNE);
 	RunMode_Switch(S_Wait);//初始状态设为“wait”
 
@@ -204,7 +204,7 @@ int main(void)
 					{
 					case 0x003: //pid关闭
 					case 0x004: //pid启动
-						RunMode_Switch(S_Wait);//停机
+						RunMode_Switch(S_Wait);//停机，这时oled上pid显示是相反的
 						Ctrl_Para.enable_pid[0] = cmd_sub - 3;//pid总使能位赋值
 						break;
 					case 0x005: //失能跟踪曲线
@@ -259,7 +259,7 @@ int main(void)
 					}
 					for (int i = 0; i < 3; i++)
 					{
-						OLED_ShowNum(2, 1 + i * 5, (uint32_t)Ctrl_Para.rpm_want[i] * 10, 5);
+						OLED_ShowNum(2, 1 + i * 5, (uint32_t)(Ctrl_Para.rpm_want[i] * 10), 5);
 					}
 					break;
 				/*跟踪曲线相位*/
@@ -455,6 +455,7 @@ void Para_init(void)
 		MyCAN_Transmit_enum(TX_Err_SavePara);
 	}
 	/*CAN相关变量*/
+	filter_init();//配置滤波器
 	CAN_Para.PendingMsg = 0;
 	/*跟踪曲线相关变量*//*系统相关变量*/
 }
@@ -642,17 +643,20 @@ void key_process_cantest(uint8_t keystate)
 	switch (keystate)
 	{
 	case SW2_SINGLE_CLICK:
-		MyCAN_Transmit_RPM(temp_cantx, temp_cantx2, 1231,1200, 1);
-		MyCAN_Transmit_RPM(3000, 4000, 5000,6000, 3);
+		MyCAN_Transmit_RPM((uint16_t)temp_cantx, (uint16_t)temp_cantx2, 1231,1200, 1);
+		//yCAN_Transmit_RPM(3000, 4000, 5000,6000, 3);
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		OLED_ShowString(4, 7, "trpm");
 		break;
 	case SW2_LONG_PRESS:
 		MyCAN_Transmit_enum(TX_Err_RXTrackData);
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		OLED_ShowString(4, 7, "terr");
 		break;
 	case SW3_LONG_PRESS:
 		MyCAN_Transmit_enum(TX_Heartbeat);
 		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+		OLED_ShowString(4, 7, "tbeat");
 		break;
 	default:
 		break;

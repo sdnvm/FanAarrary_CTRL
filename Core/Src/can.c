@@ -204,9 +204,9 @@ void MyCAN_Transmit_RPM(const uint16_t rpm_real1, const uint16_t rpm_ctrl1, cons
 {
 	if (Sys_Para.enable_send == 1)
 	{
-		uint32_t txid = 0x00000000; //id
+		uint32_t txid = (Sys_Para.ID_Thisboard  << 4); //本机id
+		//uint32_t txid = 0x7F0; //上位机id
 		uint8_t txdata[8]; //data(一帧)
-		txid |= ((Sys_Para.ID_Thisboard & 0x7F) << 4);
 		if (c2 == 1)
 		{
 			txid |= 0x0E; //上传A转速数据
@@ -225,7 +225,8 @@ void MyCAN_Transmit_RPM(const uint16_t rpm_real1, const uint16_t rpm_ctrl1, cons
 /*按类型直接上传数据*/
 void MyCAN_Transmit_enum(const TXType TX_Tpye)
 {
-	uint8_t upload_type = 0;
+	uint8_t upload_type[2] = {0,0};
+	uint8_t id_temp = Sys_Para.ID_Thisboard >> 4;
 	switch (TX_Tpye)
 	{
 	case TX_SYSPara://上传系统参数
@@ -238,10 +239,11 @@ void MyCAN_Transmit_enum(const TXType TX_Tpye)
 	case TX_Err_CAN:
 	case TX_Err_RXTrackData://请求重发跟踪曲线数据
 	case TX_Err_SavePara:
-		upload_type = TX_Tpye;
-		MyCAN_Transmit(0x07FD, &upload_type, 1);
+		memcpy(&upload_type[0], &id_temp, 1);
+		upload_type[1] = TX_Tpye;
+		MyCAN_Transmit(0x07FD, upload_type, 2);
 		OLED_ShowString(4, 1, "err");
-		OLED_ShowNum(4, 4, upload_type, 2);
+		OLED_ShowNum(4, 4, (uint32_t)upload_type[0], 2);
 		break;
 	default:
 		break;
