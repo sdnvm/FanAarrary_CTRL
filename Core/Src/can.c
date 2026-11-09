@@ -226,7 +226,7 @@ void MyCAN_Transmit_RPM(const uint16_t rpm_real1, const uint16_t rpm_ctrl1, cons
 void MyCAN_Transmit_enum(const TXType TX_Tpye)
 {
 	uint8_t upload_type[2] = {0,0};
-	uint8_t id_temp = Sys_Para.ID_Thisboard >> 4;
+	uint8_t id_temp;
 	switch (TX_Tpye)
 	{
 	case TX_SYSPara://上传系统参数
@@ -239,6 +239,8 @@ void MyCAN_Transmit_enum(const TXType TX_Tpye)
 	case TX_Err_CAN:
 	case TX_Err_RXTrackData://请求重发跟踪曲线数据
 	case TX_Err_SavePara:
+		//id_temp |= 0x0D;
+		id_temp = Sys_Para.ID_Thisboard;
 		memcpy(&upload_type[0], &id_temp, 1);
 		upload_type[1] = TX_Tpye;
 		MyCAN_Transmit(0x07FD, upload_type, 2);

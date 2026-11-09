@@ -13,6 +13,13 @@ extern void set_rpm(uint8_t temp_cc, float rpm);
 /*控制量计算*/
 void pid_control(const uint8_t c, const uint32_t CCR_num)
 {
+	static uint16_t cont_rpm_last;
+	static uint16_t actual_rpm_last;
+	if (c == chanel_send_rpm)
+	{
+		cont_rpm_last = (uint16_t)cont_rpm[chanel_send_rpm];
+		actual_rpm_last = (uint16_t)pid_para[chanel_send_rpm].actual_rpm;
+	}
 	pid_para[c].actual_rpm = (float)(3.6e8 / (double)CCR_num); //计算实际转速 RPM
 	if ((uint32_t)pid_para[c].actual_rpm == 65535)pid_para[c].actual_rpm = 0.0f; //溢出处理
 	pid_para[c].err = pid_para[c].target_rpm - pid_para[c].actual_rpm;//计算偏差
@@ -33,10 +40,10 @@ void pid_control(const uint8_t c, const uint32_t CCR_num)
 			Ctrl_Para.enable_pid[c + 1] = 1;
 		}
 	}
-	if ((c == 1))
+	if ((c == chanel_send_rpm))
 	{
-		MyCAN_Transmit_RPM((uint16_t)pid_para[c-1].actual_rpm, (uint16_t)cont_rpm[c-1],
-						   (uint16_t)pid_para[c].actual_rpm, (uint16_t)cont_rpm[c], c);
+		MyCAN_Transmit_RPM(actual_rpm_last, cont_rpm_last,
+			(uint16_t)pid_para[chanel_send_rpm].actual_rpm, (uint16_t)cont_rpm[chanel_send_rpm], c);
 		OLED_ShowNum(3, 1 + c * 4, (uint16_t)pid_para[c].actual_rpm, 4);
 	}
 }

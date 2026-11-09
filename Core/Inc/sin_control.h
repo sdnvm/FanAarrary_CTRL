@@ -11,8 +11,8 @@ typedef struct
 	float mid; // 中值（）
 	int period; // 周期(单位:ms)
 	float amplitude; //幅值
-	uint16_t ctrl_num;
-	uint16_t sampl_num;
+	uint16_t ctrl_num;//用于实际控制采样时间，定时器溢出ctrl_num次后触发更新
+	uint16_t sampl_num;//采样点个数
 } SinParams;
 
 #define M_PAI 3.141593f

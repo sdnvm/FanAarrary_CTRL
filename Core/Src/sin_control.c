@@ -5,9 +5,9 @@
 SinParams Sin_Para1;
 uint8_t sin_point_index = 0;
 // 更新正弦波参数并启动分批计算
-void cacul_sin_params()
+/*void cacul_sin_params()
 {
-	TrackCurve_Para.ctrl_num = Sin_Para1.ctrl_num;
+	TrackCurve_Data_p->call_num = Sin_Para1.ctrl_num;
 	Sin_Para1.sampl_num = (uint16_t)(Sin_Para1.period / (Sin_Para1.ctrl_num * Sys_Para.timer_ctrl_T)); //tim单位都是ms
 	sin_point_index = 0; // 重置使用索引
 
@@ -42,7 +42,7 @@ void cacul_sin_params()
 	}
 	TrackCurve_Para.enable_TrackCurve = 1;
 	OLED_ShowString(4, 16, "O");
-}
+}*/
 
 /*跟踪曲线控制量更新函数
  * 每次流控定时器中断调用一次，更新目标值
@@ -50,24 +50,26 @@ void cacul_sin_params()
  */
 void TrackCurve()
 {
-	static uint16_t ctrl_tim = 0; //决定采样时间
-	ctrl_tim++; //每次定时器中断+1,决定采样时间
-	if (ctrl_tim >= Sin_Para1.ctrl_num && Sys_State.RunMode == S_TrackingCurve)
+	static uint16_t call_num = 0;
+	static uint16_t index_data = 0;
+	call_num++; //每次定时器中断+1,决定采样时间 = call_num最大值 * 控制定时器溢出时间
+	if (call_num < TrackCurve_Data_p->call_num)
 	{
-		if (sin_point_index == Sin_Para1.sampl_num)
+		return; //未到达采样时间，直接返回
+	}
+	if (Sys_State.RunMode == S_TrackingCurve && TrackCurve_Para.enable_TrackCurve)
+	{
+		// 检查是否到达曲线末尾
+		if (index_data + 1 >= TrackCurve_Data_p->num_data)
 		{
-			sin_point_index = 0; // 重置索引，为下一个正弦波做准备
+			index_data = 0; // 重置索引
 		}
 		// 从跟踪曲线数据中获取当前点的值
-		/*if (c == 1) {
-		pid_para[0].target_rpm = sin_control_values[sin_point_index];
-		} else if (c == 2) {*/
 		for (int i = 0; i <= 4; i++)
 		{
-			set_rpm_incloseloopmode(i, TrackCurve_Data_p->curve_data[sin_point_index]);
+			set_rpm_incloseloopmode(i, TrackCurve_Data_p->curve_data[index_data]);
 		}
-		// }
-		sin_point_index++; // 移动到下一个点
-		ctrl_tim = 0; // 重置溢出计数器
+		index_data++; // 移动到下一个点
+		call_num = 0; // 重置溢出计数器
 	}
 }

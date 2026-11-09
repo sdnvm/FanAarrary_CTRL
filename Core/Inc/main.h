@@ -104,15 +104,11 @@ typedef struct
 typedef struct
 {
 	bool enable_TrackCurve;		//失能跟踪
-	uint16_t sample_time;		//采样时间 ms
-	uint16_t phase[4];			//曲线相位 ms，收到启动信号后延时时间
-	uint16_t ctrl_num;			//乘ctrl_time=sin_ctrl_time
-	uint16_t num_data;			//数据点个数
-	uint32_t num_data_received;	//当前收到的有效数据包数量
 	uint16_t buffer_byte;		//缓冲区字节数
 	bool is_assembling;			//正在接收曲线数据？
 	bool start_cacul;			//开始计算
 	//bool is_received[CURVE_SAMPLE_MX];//成功收到数据？
+	uint8_t curve_type;			//曲线类型，1=数据点，2=sin，3=锯齿
 }TrackCurvePara;
 /*跟踪曲线数据*/
 #define CURVE_SAMPLE_MX 256			//拟合曲线缓冲区大小
@@ -121,8 +117,8 @@ typedef struct
 	uint16_t curve_data[CURVE_SAMPLE_MX]; //跟踪曲线数据缓冲区
 	uint16_t sample_time;		//采样时间 ms
 	uint16_t phase[4];			//曲线相位 ms
-	uint16_t length;			//帧个数
-	uint16_t ctrl_num;			//乘ctrl_time=sin_ctrl_time
+	uint16_t num_data;			//一个周期内采样点个数
+	uint16_t call_num;			//用于实际控制采样时间，定时器溢出ctrl_num次后触发更新。乘ctrl_time=sin_ctrl_time
 }TrackCurveData;
 
 /* USER CODE END ET */
@@ -188,11 +184,13 @@ void Error_Handler(void);
 #if (SELECTER_IO_FAN == 1)
 #define FANSPEED_MAX 20000		//输入端风扇最大转速
 #elif (SELECTER_IO_FAN == 2)
-	#define FANSPEED_MAX 17500	//输出端风扇最大转速
+	#define FANSPEED_MAX 12500	//输出端风扇最大转速
 #endif
 
 #define PWM_ARR 4130					//pwm寄存器溢出值
 #define RPM_TO_ARR ((double)PWM_ARR/FANSPEED_MAX)	//转速转arr值
+
+#define chanel_send_rpm 1	//发送转速的通道，0-3
 
 //#define KTS (60.0f*DC_POWER/12)
 //#define KCCR (30*72000000)/2/8/10

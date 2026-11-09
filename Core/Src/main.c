@@ -132,10 +132,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 	while (1)
 	{
-		if(TrackCurve_Para.start_cacul)
-		{
-			cacul_sin_params();
-		}
 		if (Sys_Para.enable_key)
 		{
 			KeyState = Key_GetState();
@@ -246,13 +242,13 @@ int main(void)
 					}
 					break;
 				/*目标转速首帧、尾帧*/
-				case 0x03: //
+				case 0x03: //1、2目标转速
 					for (int i = 0; i < 2; i++)
 					{
 						memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 4], 4);
 					}
 					break;
-				case 0x04: //目标转速尾帧
+				case 0x04: //3、4目标转速
 					for (int i = 0; i < 2; i++)
 					{
 						memcpy(&Ctrl_Para.rpm_want[i + 2], &CAN_Data.RxData[i * 4], 4);
@@ -263,11 +259,20 @@ int main(void)
 					}
 					break;
 				/*跟踪曲线相位*/
-				case 0x0A:
-					for (int i = 0; i < 4; i++)
+				case 0x0A: //1、2相位
+					for (int i = 0; i < 2; i++)
 					{
-						memcpy(&TrackCurve_Para.phase[i], &CAN_Data.RxData[i * 2], 2);
-						OLED_ShowNum(2, 1 + i * 4, TrackCurve_Para.phase[i], 4);
+						memcpy(&TrackCurve_Data.phase[i], &CAN_Data.RxData[i * 4], 4);
+					}
+					break;
+				case 0x0B: //3、4相位
+					for (int i = 0; i < 2; i++)
+					{
+						memcpy(&TrackCurve_Data.phase[i + 2], &CAN_Data.RxData[i * 4], 4);
+					}
+					for (int i = 0; i < 3; i++)
+					{
+						OLED_ShowNum(2, 1 + i * 5, (uint32_t)(TrackCurve_Data.phase[i] * 10), 5);
 					}
 					break;
 				default:
@@ -293,40 +298,52 @@ int main(void)
 			if (HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO1, &CAN_Data.can_RxHeader, CAN_Data.RxData) == HAL_OK) //接收成功
 			{
 				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+				static uint16_t num_data_received = 0; //当前收到的有效数据量
 				switch (CAN_Data.can_RxHeader.StdId)
 				{
 				case 0x006: //curve首帧
 					{
-						RunMode_Switch(S_TrackingCurve);
-						memcpy(&TrackCurve_Para.num_data, CAN_Data.RxData, 2); //帧个数
-						memcpy(&TrackCurve_Para.sample_time, &CAN_Data.RxData[2], 2); //采样时间ms
+						RunMode_Switch(S_Wait);//停机，等待数据接收完毕
+						memcpy(&TrackCurve_Data.num_data, CAN_Data.RxData, 2); //采样点个数
+						memcpy(&TrackCurve_Data.sample_time, &CAN_Data.RxData[2], 2); //采样时间ms
+						memcpy(&TrackCurve_Para.curve_type, &CAN_Data.RxData[4], 1); //曲线类型
 						memset(&TrackCurve_Data.curve_data, 0xF, sizeof(TrackCurve_Data.curve_data)); //初始化接收缓冲区
-						TrackCurve_Para.is_assembling = true; //开始接收
-						TrackCurve_Para.num_data_received = 0; //初始化已收到数据量
+						TrackCurve_Para.is_assembling = true; //接收中标志位
 						break;
 					}
 				case 0x007: //curve中间帧
 					{
-						if (!TrackCurve_Para.is_assembling)
+						/*if (!TrackCurve_Para.is_assembling)
 						{
 							MyCAN_Transmit_enum(TX_Err_RXTrackData); //未接收首帧，请求重收
 							break;
-						}
-						memcpy(&TrackCurve_Data.curve_data[TrackCurve_Para.num_data_received], CAN_Data.RxData, 4); //
-						memcpy(&TrackCurve_Data.curve_data[TrackCurve_Para.num_data_received + 1], &CAN_Data.RxData[4],
-							   4); //
-						TrackCurve_Para.num_data_received += 2;
+						}*/
+						memcpy(&TrackCurve_Data.curve_data[num_data_received], CAN_Data.RxData, 2); //
+						memcpy(&TrackCurve_Data.curve_data[num_data_received + 1], &CAN_Data.RxData[2], 2); //
+						memcpy(&TrackCurve_Data.curve_data[num_data_received + 2], &CAN_Data.RxData[4], 2); //
+						memcpy(&TrackCurve_Data.curve_data[num_data_received + 3], &CAN_Data.RxData[6], 2); //
+						num_data_received += 4;
 						break;
 					}
 				case 0x008: //curve尾帧
 					{
 						//数据完整性判断
-						if ((TrackCurve_Para.num_data_received - TrackCurve_Para.num_data == 1) || (TrackCurve_Para.
-							num_data_received == TrackCurve_Para.num_data))
+						if (num_data_received - TrackCurve_Data.num_data <= 1)
 						{
 							TrackCurve_Para.is_assembling = false;
-							TrackCurve_Para.enable_TrackCurve = true;
+							TrackCurve_Data.call_num = (uint16_t)(TrackCurve_Data.sample_time / Sys_Para.timer_ctrl_T); //计算定时器溢出多少次触发更新
 							RunMode_Switch(S_Wait);
+							if (Sys_State.manu == can_test)
+							{
+								OLED_Clear();
+								for (int i = 0; i < 4; i++)
+								{
+									for (int j = 0; j < 4; j++)
+									{
+										OLED_ShowNum(1 + i, 1 + j * 4, TrackCurve_Data.curve_data[i * 4 + j], 4);
+									}
+								}
+							}
 						}
 						else
 						{
@@ -344,7 +361,7 @@ int main(void)
 							RunMode_Switch(S_Wait);
 							//memcpy(&Sys_Para.timer_pwm_ARR, &CAN_Data.RxData[0], 2); //pwm计数器ARR
 							memcpy(&Sys_Para.timer_ctrl_T, &CAN_Data.RxData[2], 2); //采样时间
-							SamplingTime_Modify(Sys_Para.timer_ctrl_T, 0);
+							SamplingTime_Modify(Sys_Para.timer_ctrl_T, 0);	//更新采样时间
 							for (int i = 0; i < 4; i++)
 							{
 								memcpy(&pid_para_base.Kp, &CAN_Data.RxData[4], 4); //p
@@ -361,10 +378,13 @@ int main(void)
 								pid_para[i].Kd = pid_para_base.Kd;
 							}
 							rxcount_pid = 0;
-							OLED_ShowString(2, 5, "|    |");
-							OLED_ShowNum(2, 1, (uint16_t)(pid_para[0].Kp * 1000.0f), 4);
-							OLED_ShowNum(2, 6, (uint16_t)(pid_para[0].Ki * 1000.0f), 4);
-							OLED_ShowNum(2, 11, (uint16_t)(pid_para[0].Kd * 1000.0f), 4);
+							if (Sys_State.manu == para_setting)
+							{
+								OLED_ShowString(2, 5, "|    |");
+								OLED_ShowNum(2, 1, (uint16_t)(pid_para[0].Kp * 1000.0f), 4);
+								OLED_ShowNum(2, 6, (uint16_t)(pid_para[0].Ki * 1000.0f), 4);
+								OLED_ShowNum(2, 11, (uint16_t)(pid_para[0].Kd * 1000.0f), 4);
+							}
 						}
 						break;
 					}
@@ -443,7 +463,7 @@ void Para_init(void)
 		Sys_Para.enable_OLED = true;
 		Sys_Para.enable_key = true;
 		Sys_Para.enable_pid = false;
-		Sys_Para.timer_ctrl_T = 200;
+		Sys_Para.timer_ctrl_T = 200;//200ms
 		Sys_Para.timer_fg_f = 12;//mhz
 		//Sys_Para.timer_pwm_ARR = 4130;
 		/*pid相关变量*/
