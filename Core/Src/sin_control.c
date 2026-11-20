@@ -50,26 +50,28 @@ uint8_t sin_point_index = 0;
  */
 void TrackCurve()
 {
-	static uint16_t call_num = 0;
-	static uint16_t index_data = 0;
+	static uint16_t call_num = 0; //溢出计数器
+	static uint16_t index_data = 0; //曲线数据索引
+	if (Sys_State.RunMode != S_TrackingCurve || !TrackCurve_Para.enable_TrackCurve)
+	{
+		call_num = 0;
+		return; // 如果不是跟踪曲线模式或未启用跟踪曲线，则直接返回
+	}
 	call_num++; //每次定时器中断+1,决定采样时间 = call_num最大值 * 控制定时器溢出时间
 	if (call_num < TrackCurve_Data_p->call_num)
 	{
 		return; //未到达采样时间，直接返回
 	}
-	if (Sys_State.RunMode == S_TrackingCurve && TrackCurve_Para.enable_TrackCurve)
+	// 检查是否到达曲线末尾
+	if (index_data + 1 >= TrackCurve_Data_p->num_data)
 	{
-		// 检查是否到达曲线末尾
-		if (index_data + 1 >= TrackCurve_Data_p->num_data)
-		{
-			index_data = 0; // 重置索引
-		}
-		// 从跟踪曲线数据中获取当前点的值
-		for (int i = 0; i <= 4; i++)
-		{
-			set_rpm_incloseloopmode(i, TrackCurve_Data_p->curve_data[index_data]);
-		}
-		index_data++; // 移动到下一个点
-		call_num = 0; // 重置溢出计数器
+		index_data = 0; // 重置索引
 	}
+	// 从跟踪曲线数据中获取当前点的值
+	for (int i = 0; i <= 4; i++)
+	{
+		set_rpm_incloseloopmode(i, TrackCurve_Data_p->curve_data[index_data]);
+	}
+	index_data++; // 移动到下一个点
+	call_num = 0; // 重置溢出计数器
 }

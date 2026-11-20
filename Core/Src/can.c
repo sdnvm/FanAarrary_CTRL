@@ -131,17 +131,17 @@ void filter_init(void)
 	filter1.FilterIdHigh = (0x001 << 5); //广播的复位、启停
 	filter1.FilterIdLow = (0x002 << 5); //广播的使能/失能、保存参数
 	filter1.FilterMaskIdHigh = (Sys_Para.ID_Thisboard << 9 | 0x001 << 5); //复位、启停
-	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x002 << 5); //使能/失能、保存参数、上传状态/转速
+	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x002 << 5); //cmd指令：保存参数、上传一次状态
 	HAL_CAN_ConfigFilter(&hcan, &filter1);
 	filter1.FilterBank = 1;
-	filter1.FilterIdHigh = (0x003 << 5); //广播的目标值首帧
-	filter1.FilterIdLow = (0x004 << 5); //广播的目标值尾帧
-	filter1.FilterMaskIdHigh = (Sys_Para.ID_Thisboard << 9 | 0x003 << 5); //目标值首帧
-	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x004 << 5); //目标值尾帧
+	filter1.FilterIdHigh = (0x004 << 5); //广播的目标值首帧
+	filter1.FilterIdLow = (0x005 << 5); //广播的目标值尾帧
+	filter1.FilterMaskIdHigh = (Sys_Para.ID_Thisboard << 9 | 0x004 << 5); //目标值首帧
+	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x005 << 5); //目标值尾帧
 	HAL_CAN_ConfigFilter(&hcan, &filter1);
 	filter1.FilterBank = 2;
-	filter1.FilterIdHigh = (0x07F << 5); //相位首帧
-	filter1.FilterIdLow = (0x07F << 5); //相位尾帧
+	filter1.FilterIdHigh = (0x07F << 5);
+	filter1.FilterIdLow = (0x003 << 5); //基本参数设定
 	filter1.FilterMaskIdHigh = (Sys_Para.ID_Thisboard << 9 | 0x00A << 5); //相位首帧
 	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x00B << 5); //相位尾帧
 	HAL_CAN_ConfigFilter(&hcan, &filter1);
@@ -225,34 +225,47 @@ void MyCAN_Transmit_RPM(const uint16_t rpm_real1, const uint16_t rpm_ctrl1, cons
 /*按类型直接上传数据*/
 void MyCAN_Transmit_enum(const TXType TX_Tpye)
 {
-	uint8_t upload_type[2] = {0,0};
-	uint8_t id_temp;
+	uint8_t upload_data[8] = {0,0,0,0,0,0,0,0};
+	uint8_t temp1 = 0;
 	switch (TX_Tpye)
 	{
 	case TX_SYSPara://上传系统参数
 		//todo：上传本机当前状态
+
 		break;
-	case TX_Heartbeat://上传心跳包
+	case TX_Heartbeat: //上传心跳包
 		//todo:心跳包
+		//第一帧
+		upload_data[0] = 0; //当前帧序号
+		upload_data[1] = Sys_Para.enable_pid | TrackCurve_Para.enable_TrackCurve << 1 | Sys_Para.enable_OLED << 2 |
+			Sys_Para.enable_key << 3 | Sys_Para.enable_send << 4; //使能位
+		uint16_t temp2 = Sys_Para.FanSpeed_max;
+		memcpy(&upload_data[1], &temp2, 2); //最大转速
+		temp2 = Sys_Para.timer_pwm_ARR;
+		memcpy(&upload_data[3], &temp2, 2); //pwm计数器ARR
+		temp2 = Sys_Para.timer_ctrl_T;
+		memcpy(&upload_data[5], &temp2, 2); //采样时间
+		//todo:pid校验和
+		MyCAN_Transmit(0x07FC, upload_data, 8);
 		break;
 	case TX_ERR:
 	case TX_Err_CAN:
 	case TX_Err_RXTrackData://请求重发跟踪曲线数据
 	case TX_Err_SavePara:
 		//id_temp |= 0x0D;
-		id_temp = Sys_Para.ID_Thisboard;
-		memcpy(&upload_type[0], &id_temp, 1);
-		upload_type[1] = TX_Tpye;
-		MyCAN_Transmit(0x07FD, upload_type, 2);
+		temp1 = Sys_Para.ID_Thisboard;
+		memcpy(&upload_data[0], &temp1, 1);//id
+		upload_data[1] = TX_Tpye;//err类型
+		MyCAN_Transmit(0x07FD, upload_data, 2);
 		OLED_ShowString(4, 1, "err");
-		OLED_ShowNum(4, 4, (uint32_t)upload_type[0], 2);
+		OLED_ShowNum(4, 4, (uint32_t)upload_data[0], 2);
 		break;
 	default:
 		break;
 	}
 }
 /*fifo0收信中断回调*/
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan1)
+/*void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan1)
 {
 	CAN_RxHeaderTypeDef rxHeader;
 	uint8_t rxData[8];
@@ -264,7 +277,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan1)
 	}
 }
 
-/*fifo1收信中断回调*/
+/*fifo1收信中断回调#1#
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef* hcan2)
 {
 	CAN_RxHeaderTypeDef rxHeader;
@@ -286,5 +299,5 @@ void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef* hcan2)
 	default:
 		break;
 	}
-}
+}*/
 /* USER CODE END 1 */

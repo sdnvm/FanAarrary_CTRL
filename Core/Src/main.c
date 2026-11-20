@@ -193,28 +193,11 @@ int main(void)
 						break;
 					}
 					break;
-				/*使能/失能、保存参数*/
+				/*基本指令*/
 				case 0x02: //
 					memcpy(&cmd_sub, &CAN_Data.RxData[0], 2);//cmd是数据段2字节
 					switch (cmd_sub)
 					{
-					case 0x003: //pid关闭
-					case 0x004: //pid启动
-						RunMode_Switch(S_Wait);//停机，这时oled上pid显示是相反的
-						Ctrl_Para.enable_pid[0] = cmd_sub - 3;//pid总使能位赋值
-						break;
-					case 0x005: //失能跟踪曲线
-					case 0x006: //使能跟踪曲线
-						TrackCurve_Para.enable_TrackCurve = cmd_sub - 5;
-						if (TrackCurve_Para.enable_TrackCurve)
-						{
-							RunMode_Switch(S_TrackingCurve);
-						}
-						else
-						{
-							RunMode_Switch(S_Wait);
-						}
-						break;
 					case 0x007: //保存参数
 						if (Flash_SaveSysPara(&Sys_Para, &pid_para_base) == HAL_OK)
 						{
@@ -229,26 +212,51 @@ int main(void)
 					case 0x008: //上传一次本机状态
 						MyCAN_Transmit_enum(TX_SYSPara);
 						break;
-					case 0x009: //使能上传转速
-						Sys_Para.enable_send = !Sys_Para.enable_send;
-						break;
-					case 0x00A://使能oled显示
-						Sys_Para.enable_OLED = !Sys_Para.enable_OLED;
-						break;
-					case 0x00B:
-						Sys_Para.enable_key = !Sys_Para.enable_key;
 					default:
 						break;
 					}
 					break;
+				/*使能/失能、基本参数设定*/
+				case 0x03:
+					memcpy(&cmd_sub, &CAN_Data.RxData[0], 1);//取使能cmd，数据段第1字节
+					RunMode_Switch(S_Wait);
+					//读使能位
+					Ctrl_Para.enable_pid[0] = cmd_sub & 0x01; //pid总使能位赋值
+					TrackCurve_Para.enable_TrackCurve = cmd_sub & 0x02; //跟踪曲线使能位赋值
+					Sys_Para.enable_OLED = cmd_sub & 0x03; //oled使能位赋值
+					Sys_Para.enable_key = cmd_sub & 0x04; //按键使能位赋值
+					Sys_Para.enable_send = cmd_sub & 0x05; //上传转速使能位赋值
+					//读参数
+					uint16_t temp;
+					memcpy(&temp, &CAN_Data.RxData[1], 2); //取最大转速
+					if (Sys_Para.FanSpeed_max != temp)
+					{
+						Sys_Para.FanSpeed_max = temp;
+						Sys_Para.rpm_to_arr = (double)Sys_Para.timer_pwm_ARR / (double)Sys_Para.FanSpeed_max; //更新转速转换arr
+					}
+					memcpy(&temp, &CAN_Data.RxData[3], 2); //取arr值
+					if (Sys_Para.timer_pwm_ARR != temp)
+					{
+						SamplingTime_Modify(0, Sys_Para.timer_pwm_ARR);
+					}
+					//特殊动作
+					if (TrackCurve_Para.enable_TrackCurve)
+					{
+						RunMode_Switch(S_TrackingCurve);
+					}
+					else
+					{
+						RunMode_Switch(S_Wait);
+					}
+					break;
 				/*目标转速首帧、尾帧*/
-				case 0x03: //1、2目标转速
+				case 0x04: //1、2目标转速
 					for (int i = 0; i < 2; i++)
 					{
 						memcpy(&Ctrl_Para.rpm_want[i], &CAN_Data.RxData[i * 4], 4);
 					}
 					break;
-				case 0x04: //3、4目标转速
+				case 0x05: //3、4目标转速
 					for (int i = 0; i < 2; i++)
 					{
 						memcpy(&Ctrl_Para.rpm_want[i + 2], &CAN_Data.RxData[i * 4], 4);
