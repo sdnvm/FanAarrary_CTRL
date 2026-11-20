@@ -71,17 +71,17 @@ typedef struct
 	__IO double rpm_to_arr;		//转速转换arr
 	__IO uint16_t FanSpeed_max;	//风机最大转速
 	uint16_t timer_pwm_ARR;		//pwm定时器溢出值
-	bool enable_send;			//使能向上位机同步数据？
-	bool enable_OLED;			//使能OLED显示？
-	bool enable_key;			//使能按键？
+	__IO bool enable_send;		//使能向上位机同步数据？
+	__IO bool enable_OLED;		//使能OLED显示？
+	__IO bool enable_key;		//使能按键？
 	__IO bool enable_pid;		//使能pid？
 }SysPara;
 /*控制器相关参数*/
 typedef struct 
 {
 	float rpm_want[4];			//目标转速
-	__IO bool enable_fan[5];			//风机开关状态，[0]为总开关,后几个为具体开关
-	__IO bool enable_pid[5];			//pid开关状态，[0]为开关，后几个由程序控制，别直接写1
+	__IO bool enable_fan[5];	//风机开关状态，[0]为总开关,后几个为具体开关
+	__IO bool enable_pid[5];	//pid开关状态，[0]为开关，后几个由程序控制，别直接写1
 }CtrlPara;
 typedef struct
 {
@@ -91,7 +91,7 @@ typedef struct
 typedef struct 
 {
 	uint8_t PendingMsg;			//待解析数据量
-	__IO bool is_Can_TXSec;			//正在发送？
+	__IO bool is_Can_TXSec;		//正在发送？
 }CANPara;
 /*一个can数据包*/
 typedef struct 
@@ -112,7 +112,7 @@ typedef struct
 	uint8_t curve_type;			//曲线类型，1=数据点，2=sin，3=锯齿
 }TrackCurvePara;
 /*跟踪曲线数据*/
-#define CURVE_SAMPLE_MX 256			//拟合曲线缓冲区大小
+#define CURVE_SAMPLE_MX 256		//拟合曲线缓冲区大小
 typedef struct
 {
 	uint16_t curve_data[CURVE_SAMPLE_MX]; //跟踪曲线数据缓冲区

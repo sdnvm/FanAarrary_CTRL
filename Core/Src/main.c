@@ -218,14 +218,14 @@ int main(void)
 					break;
 				/*使能/失能、基本参数设定*/
 				case 0x03:
-					memcpy(&cmd_sub, &CAN_Data.RxData[0], 1);//取使能cmd，数据段第1字节
 					RunMode_Switch(S_Wait);
+					memcpy(&cmd_sub, &CAN_Data.RxData[0], 1);//取使能cmd，数据段第1字节
 					//读使能位
 					Ctrl_Para.enable_pid[0] = cmd_sub & 0x01; //pid总使能位赋值
 					TrackCurve_Para.enable_TrackCurve = cmd_sub & 0x02; //跟踪曲线使能位赋值
-					Sys_Para.enable_OLED = cmd_sub & 0x03; //oled使能位赋值
-					Sys_Para.enable_key = cmd_sub & 0x04; //按键使能位赋值
-					Sys_Para.enable_send = cmd_sub & 0x05; //上传转速使能位赋值
+					Sys_Para.enable_OLED = cmd_sub & 0x04; //oled使能位赋值
+					Sys_Para.enable_key = cmd_sub & 0x08; //按键使能位赋值
+					Sys_Para.enable_send = cmd_sub & 0x10; //上传转速使能位赋值
 					//读参数
 					uint16_t temp;
 					memcpy(&temp, &CAN_Data.RxData[1], 2); //取最大转速
@@ -470,7 +470,6 @@ void Para_init(void)
 		Sys_State.RunMode = S_Wait;
 		Sys_State.manu = id_setting;
 		Sys_Para.ID_Thisboard = 0x00000003;
-		//Sys_Para.Speed_MX_Fan = 17500;
 		Sys_Para.enable_send = false;
 		Sys_Para.enable_OLED = true;
 		Sys_Para.enable_key = true;
@@ -496,7 +495,7 @@ void Para_init(void)
 //状态切换
 void RunMode_Switch(SM_SysRunMode run_mode)
 {
-	HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
+	//HAL_GPIO_TogglePin(LED_GPIO_Port,LED_Pin);
 	switch (run_mode)
 	{
 	case S_Wait://停机等待，进行数据接收等

@@ -134,14 +134,14 @@ void filter_init(void)
 	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x002 << 5); //cmd指令：保存参数、上传一次状态
 	HAL_CAN_ConfigFilter(&hcan, &filter1);
 	filter1.FilterBank = 1;
-	filter1.FilterIdHigh = (0x004 << 5); //广播的目标值首帧
-	filter1.FilterIdLow = (0x005 << 5); //广播的目标值尾帧
+	filter1.FilterIdHigh = (0x004 << 5); //目标值首帧
+	filter1.FilterIdLow = (0x005 << 5); //目标值尾帧
 	filter1.FilterMaskIdHigh = (Sys_Para.ID_Thisboard << 9 | 0x004 << 5); //目标值首帧
 	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x005 << 5); //目标值尾帧
 	HAL_CAN_ConfigFilter(&hcan, &filter1);
 	filter1.FilterBank = 2;
-	filter1.FilterIdHigh = (0x07F << 5);
-	filter1.FilterIdLow = (0x003 << 5); //基本参数设定
+	filter1.FilterIdHigh = (0x003 << 5);//基本参数设定
+	filter1.FilterIdLow = (Sys_Para.ID_Thisboard << 9 | 0x003 << 5); //基本参数设定
 	filter1.FilterMaskIdHigh = (Sys_Para.ID_Thisboard << 9 | 0x00A << 5); //相位首帧
 	filter1.FilterMaskIdLow = (Sys_Para.ID_Thisboard << 9 | 0x00B << 5); //相位尾帧
 	HAL_CAN_ConfigFilter(&hcan, &filter1);
@@ -230,23 +230,21 @@ void MyCAN_Transmit_enum(const TXType TX_Tpye)
 	switch (TX_Tpye)
 	{
 	case TX_SYSPara://上传系统参数
-		//todo：上传本机当前状态
-
+		//第一帧
+		upload_data[0] = 0; //当前帧序号
+		upload_data[1] = Ctrl_Para.enable_pid[0] | TrackCurve_Para.enable_TrackCurve << 1 | Sys_Para.enable_OLED << 2 |
+			Sys_Para.enable_key << 3 | Sys_Para.enable_send << 4; //使能位
+		uint16_t temp2 = Sys_Para.FanSpeed_max;
+		memcpy(&upload_data[2], &temp2, 2); //最大转速
+		temp2 = Sys_Para.timer_pwm_ARR;
+		memcpy(&upload_data[4], &temp2, 2); //pwm计数器ARR
+		temp2 = Sys_Para.timer_ctrl_T;
+		memcpy(&upload_data[6], &temp2, 2); //采样时间
+		//todo:pid校验和
+		MyCAN_Transmit(0x07FC, upload_data, 8);
 		break;
 	case TX_Heartbeat: //上传心跳包
 		//todo:心跳包
-		//第一帧
-		upload_data[0] = 0; //当前帧序号
-		upload_data[1] = Sys_Para.enable_pid | TrackCurve_Para.enable_TrackCurve << 1 | Sys_Para.enable_OLED << 2 |
-			Sys_Para.enable_key << 3 | Sys_Para.enable_send << 4; //使能位
-		uint16_t temp2 = Sys_Para.FanSpeed_max;
-		memcpy(&upload_data[1], &temp2, 2); //最大转速
-		temp2 = Sys_Para.timer_pwm_ARR;
-		memcpy(&upload_data[3], &temp2, 2); //pwm计数器ARR
-		temp2 = Sys_Para.timer_ctrl_T;
-		memcpy(&upload_data[5], &temp2, 2); //采样时间
-		//todo:pid校验和
-		MyCAN_Transmit(0x07FC, upload_data, 8);
 		break;
 	case TX_ERR:
 	case TX_Err_CAN:
