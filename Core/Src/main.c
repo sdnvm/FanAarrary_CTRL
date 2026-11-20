@@ -27,7 +27,7 @@
 #include "bsp_pid.h"
 #include "control.h"
 #include "sin_control.h"
-#include "save_flash.h"
+#include "../Inc/save_flash.h"
 #include <string.h>
 #include "OLED.h"
 /* USER CODE END Includes */
@@ -303,12 +303,14 @@ int main(void)
 				{
 				case 0x006: //curve首帧
 					{
+						__disable_irq();
 						RunMode_Switch(S_Wait);//停机，等待数据接收完毕
 						memcpy(&TrackCurve_Data.num_data, CAN_Data.RxData, 2); //采样点个数
 						memcpy(&TrackCurve_Data.sample_time, &CAN_Data.RxData[2], 2); //采样时间ms
 						memcpy(&TrackCurve_Para.curve_type, &CAN_Data.RxData[4], 1); //曲线类型
 						memset(&TrackCurve_Data.curve_data, 0xF, sizeof(TrackCurve_Data.curve_data)); //初始化接收缓冲区
 						TrackCurve_Para.is_assembling = true; //接收中标志位
+						num_data_received = 0;
 						break;
 					}
 				case 0x007: //curve中间帧
@@ -328,7 +330,7 @@ int main(void)
 				case 0x008: //curve尾帧
 					{
 						//数据完整性判断
-						if (num_data_received - TrackCurve_Data.num_data <= 1)
+						if (num_data_received <= 3 + TrackCurve_Data.num_data && num_data_received >= TrackCurve_Data.num_data)
 						{
 							TrackCurve_Para.is_assembling = false;
 							TrackCurve_Data.call_num = (uint16_t)(TrackCurve_Data.sample_time / Sys_Para.timer_ctrl_T); //计算定时器溢出多少次触发更新
@@ -349,6 +351,8 @@ int main(void)
 						{
 							MyCAN_Transmit_enum(TX_Err_RXTrackData); //数据缺失，请求重收
 						}
+						num_data_received = 0;
+						__enable_irq();
 						break;
 					}
 				/*pid参数*/
@@ -465,7 +469,9 @@ void Para_init(void)
 		Sys_Para.enable_pid = false;
 		Sys_Para.timer_ctrl_T = 200;//200ms
 		Sys_Para.timer_fg_f = 12;//mhz
-		//Sys_Para.timer_pwm_ARR = 4130;
+		Sys_Para.FanSpeed_max = 12500;
+		Sys_Para.timer_pwm_ARR = 4130;
+		Sys_Para.rpm_to_arr = (double)Sys_Para.timer_pwm_ARR / Sys_Para.FanSpeed_max;
 		/*pid相关变量*/
 		pid_para_base.Kp = 0.1f;
 		pid_para_base.Ki = 0.035f;
@@ -522,7 +528,7 @@ void key_process_idsetting(uint8_t keystate)
 		OLED_Clear();
 		OLED_ShowString(1, 1, "MAX:");OLED_ShowString(1, 10, "| ID:");
 		OLED_ShowHexNum(1, 15, Sys_Para.ID_Thisboard, 2);
-		OLED_ShowNum(1, 5, FANSPEED_MAX, 5);
+		OLED_ShowNum(1, 5, Sys_Para.FanSpeed_max, 5);
 		OLED_ShowString(2, 5, "|    |");
 		OLED_ShowNum(2, 1, (uint32_t)(pid_para[3].Kp*1000),4);
 		OLED_ShowNum(2, 6, (uint32_t)(pid_para[3].Ki*1000),4);

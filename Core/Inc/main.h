@@ -66,14 +66,15 @@ typedef struct
 typedef struct 
 {
 	uint32_t ID_Thisboard;		//本机ID
-	uint16_t timer_ctrl_T;		//控制定时器溢出时间/ms
+	__IO uint16_t timer_ctrl_T;	//控制定时器溢出时间/ms
 	uint16_t timer_fg_f;		//fg捕获定时器时钟/mhz
-	//uint16_t Speed_MX_Fan;	//风机最大转速
-	//uint16_t timer_pwm_ARR;	//pwm定时器溢出值
+	__IO double rpm_to_arr;		//转速转换arr
+	__IO uint16_t FanSpeed_max;	//风机最大转速
+	uint16_t timer_pwm_ARR;		//pwm定时器溢出值
 	bool enable_send;			//使能向上位机同步数据？
 	bool enable_OLED;			//使能OLED显示？
 	bool enable_key;			//使能按键？
-	bool enable_pid;			//使能pid？
+	__IO bool enable_pid;		//使能pid？
 }SysPara;
 /*控制器相关参数*/
 typedef struct 
@@ -180,7 +181,7 @@ void Error_Handler(void);
 
 /*！！要手动改的宏！！*/
 
-#define SELECTER_IO_FAN 2				//1是inlet，2是outlet
+/*#define SELECTER_IO_FAN 2				//1是inlet，2是outlet
 #if (SELECTER_IO_FAN == 1)
 #define FANSPEED_MAX 20000		//输入端风扇最大转速
 #elif (SELECTER_IO_FAN == 2)
@@ -189,7 +190,7 @@ void Error_Handler(void);
 
 #define PWM_ARR 4130					//pwm寄存器溢出值
 #define RPM_TO_ARR ((double)PWM_ARR/FANSPEED_MAX)	//转速转arr值
-
+*/
 #define chanel_send_rpm 1	//发送转速的通道，0-3
 
 //#define KTS (60.0f*DC_POWER/12)

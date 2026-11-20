@@ -742,10 +742,12 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 /*采样时间更改
  * SamplingTime_ms:闭环采样时间ms
  * pwm_arr: pwm计数器ARR值
+ * 值为0则不更改
  */
 void SamplingTime_Modify(const uint16_t SamplingTime_ms, const uint16_t pwm_arr)
 {
-  if (SamplingTime_ms != 0)
+  RunMode_Switch(S_Wait);
+  if (SamplingTime_ms != 0 && SamplingTime_ms != Sys_Para.timer_ctrl_T)
   {
     __HAL_TIM_DISABLE_IT(&htim6, TIM_IT_UPDATE);
     uint16_t arr_value_s = (SamplingTime_ms * 10) - 1;
@@ -754,7 +756,7 @@ void SamplingTime_Modify(const uint16_t SamplingTime_ms, const uint16_t pwm_arr)
     __HAL_TIM_SET_COUNTER(&htim6, 0);
     __HAL_TIM_ENABLE_IT(&htim6, TIM_IT_UPDATE);
   }
-	/*if (pwm_arr != 0)
+	if (pwm_arr != 0 && pwm_arr != Sys_Para.timer_ctrl_T)
 	{
     Sys_Para.timer_pwm_ARR = pwm_arr;
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0); //pwm1
@@ -763,18 +765,18 @@ void SamplingTime_Modify(const uint16_t SamplingTime_ms, const uint16_t pwm_arr)
     __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, 0); //pwm4
     __HAL_TIM_SET_AUTORELOAD(&htim1, pwm_arr);
     __HAL_TIM_SET_AUTORELOAD(&htim8, pwm_arr);
-	}*/
+	}
 	if (Sys_State.manu == para_setting)
 	{
 	  OLED_ShowNum(4, 12, Sys_Para.timer_ctrl_T, 3);
-  	//OLED_ShowNum(4, 1, PWM_ARR, 4);
+  	OLED_ShowNum(3, 1, pwm_arr, 4);
 	}
 	HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 }
 void set_rpm(const uint8_t temp_cc, const float rpm)
 {
-  uint32_t comp = (uint32_t)(rpm * RPM_TO_ARR + 0.5);
-	comp = (comp > PWM_ARR) ? PWM_ARR : comp;  //限幅
+  uint32_t comp = (uint32_t)(rpm * Sys_Para.rpm_to_arr + 0.5);
+	comp = (comp > Sys_Para.timer_pwm_ARR) ? Sys_Para.timer_pwm_ARR : comp;  //限幅
 	switch(temp_cc){
 			case 0:{
 				__HAL_TIM_SET_COMPARE(&htim1,TIM_CHANNEL_2, (uint16_t)comp);//pwm1

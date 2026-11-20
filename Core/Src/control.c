@@ -27,7 +27,7 @@ void pid_control(const uint8_t c, const uint32_t CCR_num)
 	if (Ctrl_Para.enable_fan[c + 1] && Ctrl_Para.enable_pid[0])
 	{
 		cont_rpm[c] += PID_realize(&pid_para[c]); //增量式pid计算
-		cont_rpm[c] = ((cont_rpm[c] > FANSPEED_MAX) ? FANSPEED_MAX : cont_rpm[c]); // 上限处理
+		cont_rpm[c] = ((cont_rpm[c] > Sys_Para.FanSpeed_max) ? Sys_Para.FanSpeed_max : cont_rpm[c]); // 上限处理
 		cont_rpm[c] = ((cont_rpm[c] < 0) ? 0 : cont_rpm[c]); // 下限处理
 		set_rpm(c, cont_rpm[c]);
 		//return;
